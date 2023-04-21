@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="base_text">#FFFFFFFF</color>
+    <color name="text_type">#b3afaf</color>
+    <color name="fab_not_selected">#696969</color>
+</resources>

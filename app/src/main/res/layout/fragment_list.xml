@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".ListFragment">
+
+    <!-- TODO: Update blank fragment layout -->
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/objectsList"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginLeft="10dp"
+        android:layout_marginRight="10dp"
+        android:clipToPadding="false"
+        />
+    <LinearLayout
+        android:id="@+id/filter_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="10dp"
+        android:layout_marginRight="10dp"
+        android:background="?android:attr/windowBackground"
+        android:orientation="vertical">
+        <Button
+            android:id="@+id/buttonBack"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:text="Back" />
+        <EditText android:id="@+id/objectFilter"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:maxLines="1"
+            android:hint="Поиск"
+            android:paddingLeft="10dp"
+            android:background="@drawable/shape_rounded_image"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:inputType="text" />
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/switchAccessibility"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="false"
+            android:textOff="OFF"
+            android:textOn="ON"/>
+        <TextView
+            android:id="@+id/textFragment"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:textSize="12dp"
+            android:textStyle="bold"
+            android:textColor="#696969"
+            android:text="fff" />
+    </LinearLayout>
+</FrameLayout>

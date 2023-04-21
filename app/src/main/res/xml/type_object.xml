@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<types>
+    <type>
+        <nameType>Музеи Воронежа</nameType>
+        <idType>1</idType>
+        <imgResource>type1.jpg</imgResource>
+        <heightImg>220</heightImg>
+    </type>
+    <type>
+        <nameType>Музеи области</nameType>
+        <idType>2</idType>
+        <imgResource>type2.jpg</imgResource>
+        <heightImg>180</heightImg>
+    </type>
+    <type>
+        <nameType>Театры</nameType>
+        <idType>3</idType>
+        <imgResource>type3.jpg</imgResource>
+        <heightImg>220</heightImg>
+    </type>
+    <type>
+        <nameType>Храмы</nameType>
+        <idType>4</idType>
+        <imgResource>type4.jpg</imgResource>
+        <heightImg>240</heightImg>
+    </type>
+    <type>
+        <nameType>Парки</nameType>
+        <idType>5</idType>
+        <imgResource>type5.jpg</imgResource>
+        <heightImg>180</heightImg>
+    </type>
+    <type>
+        <nameType>Памятники природы</nameType>
+        <idType>6</idType>
+        <imgResource>type6.jpg</imgResource>
+        <heightImg>180</heightImg>
+    </type>
+    <type>
+        <nameType>Санатории</nameType>
+        <idType>7</idType>
+        <imgResource>type7.jpg</imgResource>
+        <heightImg>200</heightImg>
+    </type>
+    <type>
+        <nameType>Активный отдых</nameType>
+        <idType>8</idType>
+        <imgResource>type8.jpg</imgResource>
+        <heightImg>200</heightImg>
+    </type>
+    <type>
+        <nameType>Памятники</nameType>
+        <idType>9</idType>
+        <imgResource>type9.jpg</imgResource>
+        <heightImg>220</heightImg>
+    </type>
+    <type>
+        <nameType>Интересные места</nameType>
+        <idType>10</idType>
+        <imgResource>type10.jpg</imgResource>
+        <heightImg>200</heightImg>
+    </type>
+    <type>
+        <nameType>Спорт</nameType>
+        <idType>11</idType>
+        <imgResource>type11.jpg</imgResource>
+        <heightImg>220</heightImg>
+    </type>
+    <type>
+        <nameType>Развлечения</nameType>
+        <idType>12</idType>
+        <imgResource>type12.jpg</imgResource>
+        <heightImg>180</heightImg>
+    </type>
+</types>

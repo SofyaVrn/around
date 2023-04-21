@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Вокруг</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="no_data_favorites">Список пуст</string>
+    <string name="show_on_map">Посмотреть на карте</string>
+</resources>
