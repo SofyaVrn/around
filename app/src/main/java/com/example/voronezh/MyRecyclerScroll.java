@@ -1,6 +1,7 @@
 package com.example.voronezh;
 
 
+import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 public abstract class MyRecyclerScroll extends RecyclerView.OnScrollListener {
@@ -12,7 +13,7 @@ public abstract class MyRecyclerScroll extends RecyclerView.OnScrollListener {
 
     //    We dont use this method because its action is called per pixel value change
     @Override
-    public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+    public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
         super.onScrolled(recyclerView, dx, dy);
 
         //  Check scrolled distance against the minimum

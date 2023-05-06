@@ -5,8 +5,10 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -14,7 +16,6 @@ import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.PointF;
 import android.graphics.PorterDuff;
-import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.location.LocationManager;
 import android.net.Uri;
@@ -43,7 +44,6 @@ import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
 import android.view.WindowManager;
 import android.view.animation.AccelerateInterpolator;
-import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -65,6 +65,9 @@ import com.google.android.gms.tasks.Task;
 import com.google.android.material.behavior.SwipeDismissBehavior;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.squareup.picasso.MemoryPolicy;
+import com.squareup.picasso.NetworkPolicy;
+import com.squareup.picasso.Picasso;
 import com.yandex.mapkit.Animation;
 import com.yandex.mapkit.MapKitFactory;
 import com.yandex.mapkit.RequestPoint;
@@ -77,7 +80,6 @@ import com.yandex.mapkit.directions.driving.DrivingSession;
 import com.yandex.mapkit.directions.driving.VehicleOptions;
 import com.yandex.mapkit.geometry.BoundingBox;
 import com.yandex.mapkit.geometry.BoundingBoxHelper;
-import com.yandex.mapkit.geometry.Circle;
 import com.yandex.mapkit.geometry.Point;
 import com.yandex.mapkit.geometry.Polyline;
 import com.yandex.mapkit.geometry.SubpolylineHelper;
@@ -85,7 +87,6 @@ import com.yandex.mapkit.logo.Alignment;
 import com.yandex.mapkit.logo.HorizontalAlignment;
 import com.yandex.mapkit.logo.VerticalAlignment;
 import com.yandex.mapkit.map.CameraPosition;
-import com.yandex.mapkit.map.CircleMapObject;
 import com.yandex.mapkit.map.Cluster;
 import com.yandex.mapkit.map.ClusterListener;
 import com.yandex.mapkit.map.ClusterTapListener;
@@ -111,15 +112,17 @@ import com.yandex.mapkit.transport.masstransit.Transport;
 import com.yandex.runtime.Error;
 import com.yandex.runtime.image.ImageProvider;
 
-import java.io.IOException;
-import java.io.InputStream;
+import org.xmlpull.v1.XmlPullParser;
+
 import java.net.IDN;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -145,7 +148,7 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
     private static final String PREF_FAVORITES = "Favorites";
     SharedPreferences settings;
     int positionObjectSelected;
-    BottomSheetBehavior bottomSheetBehavior;
+    APIRetrofitInterface apiInterface;
 
     private boolean isVisibilityButtonsRoute = false;
     String filterText = "";
@@ -219,12 +222,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
 
     public static SearchFragment newInstance() {
         SearchFragment fragment = new SearchFragment();
-/*        Bundle args = new Bundle();
-        args.putString(ARG_PARAM1, param1);
-        args.putString(ARG_PARAM2, param2);
-        fragment.setArguments(args);
-
- */
         return fragment;
     }
 
@@ -256,9 +253,7 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
                         if (location == null) {
                             requestNewLocationData();
                         } else {
-
-                            Log.d("onComplete getLastLocation : ", String.valueOf(location.getLatitude()) + " " + String.valueOf(location.getLongitude()));
-
+                            // установка маркера положения пользователя на карте
                             ROUTE_START_LOCATION = new Point(location.getLatitude(),location.getLongitude());
                             IconStyle istyle= new IconStyle();
                             istyle.setAnchor(new PointF(0.5f,1.0f));
@@ -280,13 +275,10 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
                                 fabUserLocationVisibility = true;
                             }
 
-                            // latitudeTextView.setText(location.getLatitude() + "");
-                            // longitTextView.setText(location.getLongitude() + "");
                         }
                     }
                 });
             } else {
-                // Toast.makeText(this, "Please turn on" + " your location...", Toast.LENGTH_LONG).show();
                 Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
                 startActivity(intent);
             }
@@ -333,7 +325,7 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
         @Override
         public void onLocationResult(LocationResult locationResult) {
             Location mLastLocation = locationResult.getLastLocation();
-            Log.d("onLocationResult : ", String.valueOf(mLastLocation.getLatitude()) + " " + String.valueOf(mLastLocation.getLongitude()));
+            // установка маркера положения пользователя на карте
             ROUTE_START_LOCATION = new Point(mLastLocation.getLatitude(),mLastLocation.getLongitude());
 
             IconStyle istyle= new IconStyle();
@@ -348,9 +340,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
                 markUserObject.setZIndex(5);
             }
 
-            //setUserLayer(ROUTE_START_LOCATION);
-            // latitudeTextView.setText("Latitude: " + mLastLocation.getLatitude() + "");
-            // longitTextView.setText("Longitude: " + mLastLocation.getLongitude() + "");
         }
     };
 
@@ -396,6 +385,7 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
     public void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
 
+        //сохранение данных перед уничтожением Activity
         if (objectSelected != null) {
             outState.putSerializable(Object.class.getSimpleName(), objectSelected);
             outState.putInt("positionObjectSelected", positionObjectSelected);
@@ -418,7 +408,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
     @Override
     public void onViewStateRestored(Bundle savedInstanceState){
         super.onViewStateRestored(savedInstanceState);
-        Log.d("SearchFragment onViewStateRestored","SearchFragment onViewStateRestored");
 
         ViewFlipper viewFlipper = (ViewFlipper) getView().findViewById(R.id.viewFlipper);
         LinearLayout llBottomSheet = (LinearLayout) getView().findViewById(R.id.bottom_sheet_search);
@@ -451,9 +440,69 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
         }
     }
 
-    public void setDataFilter(String filter) {
-        Log.d("setDataFilter","setDataFilter");
+    public void sendRequestPreviewObjects(List<Object> objects){
+        //отправляет запрос серверу для получение списка preview объектов
+        apiInterface = APIRetrofitClient.getClient().create(APIRetrofitInterface.class);
 
+        ArrayList<String> arr_id = new ArrayList<>();
+        for (Object object : objects) {
+
+            arr_id.add(String.valueOf(object.getId()));
+        }
+
+        Call<PreviewObjects> call = apiInterface.getPreviewObjects(arr_id);
+
+        Log.d("CALL",call.request().headers().toString()+"");
+
+        call.enqueue(new Callback<PreviewObjects>() {
+            @Override
+            public void onResponse(Call<PreviewObjects> call, Response<PreviewObjects> response) {
+
+                Log.d("TAGCODE",response.code()+"");
+                Log.d("TAG",response.raw().protocol()+"");
+
+                if (response.code() == 200) {
+                    PreviewObjects resource = response.body();
+
+                    List<PreviewObjects.PreviewList> previewList = resource.objects;
+
+                    setPreviewObjects(previewList);
+                }
+
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<PreviewObjects> call, Throwable t) {
+                Log.d("onFailure","onFailure");
+                call.cancel();
+
+            }
+        });
+    }
+
+    public void setPreviewObjects(List<PreviewObjects.PreviewList> previewList) {
+        //устанавливает preview объектам
+        if (getView() != null) {
+            RecyclerView objectsList = (RecyclerView) getView().findViewById(R.id.objectsList);
+            ObjectAdapter objectAdapter = (ObjectAdapter) objectsList.getAdapter();
+
+            for (PreviewObjects.PreviewList preview : previewList) {
+
+                for (int i = 0; i < objectAdapter.getItemCount(); ++i) {
+                    Object object = (Object) objectAdapter.getItem(i);
+                    if (preview.id == object.getId()) {
+                        object.setImgUrl(preview.path);
+                        objectAdapter.notifyItemChanged(i);
+                        break;
+                    }
+
+                }
+            }
+        }
+    }
+
+    public void setDataFilter(String filter) {
+        //получает данные об объетах из базы погласно фильтру filter
         DatabaseAdapter adapter = new DatabaseAdapter(getContext());
         adapter.open();
 
@@ -463,28 +512,15 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
         } else {
             objectsGlobal = adapter.getGlobalObjectsFilter(filter);
         }
+        sendRequestPreviewObjects(objectsGlobal);
 
         if (!objectsGlobal.isEmpty()) {
-            for (Object object : objectsGlobal) {
-                String filename = String.valueOf(object.getId()) + ".png";
-                try (InputStream inputStream = getContext().getAssets().open(filename)) {
-                    object.setImgUrl(filename);
-                } catch (IOException e) {
-                    filename = String.valueOf(object.getId()) + ".jpg";
-                    try (InputStream inputStream = getContext().getAssets().open(filename)) {
-                        object.setImgUrl(filename);
-                    } catch (IOException e_jpg) {
-                        e_jpg.printStackTrace();
-                    }
-                    // e.printStackTrace();
-                }
-            }
-
             objects.clear();
             objects.addAll(objectsGlobal);
             RecyclerView objectsList = (RecyclerView) getView().findViewById(R.id.objectsList);
             objectsList.getAdapter().notifyDataSetChanged();
             objectsList.scrollToPosition(0);
+            //объекты отображаются на карте
             setClusterized(true);
             IconStyle istyle= new IconStyle();
             MapView mapview = (MapView) getView().findViewById(R.id.mapview);
@@ -512,8 +548,8 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        // Inflate the layout for this fragment
         View view = inflater.inflate(R.layout.fragment_search, container, false);
+        getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
         EditText userFilter = (EditText)view.findViewById(R.id.objectFilter);
 
@@ -522,10 +558,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
             public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             // при изменении текста выполняем фильтрацию
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-
-                Log.d("ListFragment","onTextChanged");
-                Log.d("FILTER :: ",  s.toString());
-                //if (!filterText.trim().isEmpty()) setDataFilter(filterText);
                 if (filterText != s.toString()) {
                     filterText = s.toString();
                     setDataFilter(filterText);
@@ -562,9 +594,7 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
         fabBack.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Log.d("FAB", "fabBack");
                 setClusterized(false);
-               // viewFlipper.setDisplayedChild(1);
                 ViewFlipper viewFlipper = (ViewFlipper) getView().findViewById(R.id.viewFlipper);
                 LinearLayout llBottomSheet = (LinearLayout) getView().findViewById(R.id.bottom_sheet_search);
                 BottomSheetBehavior bottomSheetBehavior = BottomSheetBehavior.from(llBottomSheet);
@@ -579,15 +609,12 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
                     if(isVisibilityButtonsRoute) {
                         fabDriving.animate().scaleX(0).scaleY(0).setDuration(300).start();
                         fabDriving.setClickable(false);
-//                        fabDriving.setBackgroundTintList(AppCompatResources.getColorStateList(getContext(), R.color.fab_not_selected));
 
                         fabMasstransit.animate().scaleX(0).scaleY(0).setDuration(300).start();
                         fabMasstransit.setClickable(false);
-//                        fabMasstransit.setBackgroundTintList(AppCompatResources.getColorStateList(getContext(), R.color.fab_not_selected));
 
                         fabPedestrian.animate().scaleX(0).scaleY(0).setDuration(300).start();
                         fabPedestrian.setClickable(false);
-//                        fabPedestrian.setBackgroundTintList(AppCompatResources.getColorStateList(getContext(), R.color.fab_not_selected));
 
                         fabRoute.setImageDrawable(ContextCompat.getDrawable(getContext(), R.drawable.route));
                         isVisibilityButtonsRoute = false;
@@ -632,9 +659,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
                         null);
             }
         });
-
-
- //       FloatingActionButton fabRoute = (FloatingActionButton) view.findViewById(R.id.fabRoute);
 
         ProgressBar progressBar = view.findViewById(R.id.progressBar);
 
@@ -703,19 +727,16 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
 
                 if(!isVisibilityButtonsRoute) {
                     fabRoute.setImageDrawable(ContextCompat.getDrawable(getContext(), R.drawable.close));
-                    //  fabDriving.setBackgroundTintList(AppCompatResources.getColorStateList(getApplicationContext(), R.color.fab_not_selected));
                     fabDriving.setVisibility(View.VISIBLE);
                     fabDriving.animate().scaleX(1).scaleY(1).setDuration(300).start();
                     fabDriving.setClickable(true);
 
 
-                    //   fabPedestrian.setBackgroundTintList(AppCompatResources.getColorStateList(getApplicationContext(), R.color.fab_not_selected));
                     fabPedestrian.setVisibility(View.VISIBLE);
                     fabPedestrian.animate().scaleX(1).scaleY(1).setDuration(300).start();
                     fabPedestrian.setClickable(true);
 
 
-                    //    fabMasstransit.setBackgroundTintList(AppCompatResources.getColorStateList(getApplicationContext(), R.color.fab_not_selected));
                     fabMasstransit.setVisibility(View.VISIBLE);
                     fabMasstransit.animate().scaleX(1).scaleY(1).setDuration(300).start();
                     fabMasstransit.setClickable(true);
@@ -736,7 +757,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
                     fabMasstransit.setClickable(false);
 
                     isVisibilityButtonsRoute = false;
-                    // fabDriving.setVisibility(View.GONE);
                 }
             }
         });
@@ -771,24 +791,15 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
                         fabRoute.setClickable(false);
                         fabRouteVisibility = false;
 
-                       // FloatingActionButton fabMasstransit = view.findViewById(R.id.fabMasstransit);
-                        //FloatingActionButton fabPedestrian = view.findViewById(R.id.fabPedestrian);
-                       // FloatingActionButton fabDriving = view.findViewById(R.id.fabDriving);
-
                         if(isVisibilityButtonsRoute) {
                             fabDriving.animate().scaleX(0).scaleY(0).setDuration(300).start();
                             fabDriving.setClickable(false);
-                            //fabDriving.setBackgroundTintList(AppCompatResources.getColorStateList(getContext(), R.color.fab_not_selected));
 
                             fabMasstransit.animate().scaleX(0).scaleY(0).setDuration(300).start();
                             fabMasstransit.setClickable(false);
-                            //fabMasstransit.setBackgroundTintList(AppCompatResources.getColorStateList(getContext(), R.color.fab_not_selected));
 
                             fabPedestrian.animate().scaleX(0).scaleY(0).setDuration(300).start();
                             fabPedestrian.setClickable(false);
-                            //fabPedestrian.setBackgroundTintList(AppCompatResources.getColorStateList(getContext(), R.color.fab_not_selected));
-
-
 
                             fabRoute.setImageDrawable(ContextCompat.getDrawable(getContext(), R.drawable.route));
                             isVisibilityButtonsRoute = false;
@@ -825,7 +836,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
 
             @Override
             public void onSlide(@NonNull View bottomSheet, float slideOffset) {
-                // fab.animate().scaleX(1 - slideOffset).scaleY(1 - slideOffset).setDuration(0).start();
             }
         });
 
@@ -834,23 +844,7 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
         DatabaseAdapter adapter = new DatabaseAdapter(getContext());
         adapter.open();
         objects = adapter.getObjectsSearch();
-
-        for(Object object : objects){
-
-            //Log.d("object.name :: ", object.getName());
-            String filename = String.valueOf(object.getId()) + ".png";
-            try(InputStream inputStream = getContext().getAssets().open(filename)){
-                object.setImgUrl(filename);
-            }
-            catch (IOException e){
-                filename = String.valueOf(object.getId()) + ".jpg";
-                try(InputStream inputStream = getContext().getAssets().open(filename)){
-                    object.setImgUrl(filename);
-                } catch (IOException e_jpg) {e_jpg.printStackTrace();}
-                // e.printStackTrace();
-            }
-        }
-
+        sendRequestPreviewObjects(objects);
 
         RecyclerView objectsList = (RecyclerView) view.findViewById(R.id.objectsList);
 
@@ -861,14 +855,11 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
         GridLayoutManager gridLayoutManager = new GridLayoutManager(getContext(), spanCount);
 
         objectsList.setLayoutManager(gridLayoutManager);
-       // int pixels = (int)ObjectTypeAdapter.convertDpToPixel(4,getContext());
-        //objectsList.addItemDecoration(new EqualSpacingItemDecoration(pixels));
         objectsList.setHasFixedSize(true);
 
         ObjectAdapter.OnObjectClickListener objectClickListener = new ObjectAdapter.OnObjectClickListener() {
             @Override
             public void onObjectClick(Object object, int position) {
-                //fragmentSendDataListListener.onSendDataListObject(object,position);
                 objectSelected = object;
                 positionObjectSelected = position;
                 LinearLayout llBottomSheet = (LinearLayout) getView().findViewById(R.id.bottom_sheet_search);
@@ -882,13 +873,11 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
                 }
 
                 setDataObject(object,position);
-                //viewFlipper.setDisplayedChild(0);
                 viewFlipper.setInAnimation(getContext(), R.anim.slide_in_right);
                 viewFlipper.setOutAnimation(getContext(), R.anim.slide_out_left);
                 viewFlipper.showPrevious();
                 FloatingActionButton fabBack = (FloatingActionButton) getView().findViewById(R.id.fabBack);
                 fabBack.setVisibility(View.VISIBLE);
-//!!!!!!!!!
             }
 
             @Override
@@ -902,24 +891,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
         // устанавливаем адаптер
         objectsList.setAdapter(objectAdapter);
 
-/*
-        if (objectSelected == null) {
-            viewFlipper.setDisplayedChild(1);
-        } else {
-
-            if ((bottomSheetBehavior.getState() == BottomSheetBehavior.STATE_COLLAPSED)) {
-                fabRoute.setScaleX(1);
-                fabRoute.setScaleY(1);
-                fabRoute.setClickable(true);
-                fabRouteVisibility = true;
-            }
-
-            setDataObject(objectSelected,positionObjectSelected);;
-            fabBack.setVisibility(View.VISIBLE);
-
-            viewFlipper.setDisplayedChild(0);
-        }
-*/
         ImageButton imageButtonCall = (ImageButton) view.findViewById(R.id.imageButtonCall);
         imageButtonCall.setOnClickListener(new View.OnClickListener()
         {
@@ -1041,8 +1012,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
 
         coordinatorParams.setBehavior(swipe);
 
-       // MapView mapview = (MapView) view.findViewById(R.id.mapview);
-       // MapView mapview = (MapView) getView().findViewById(R.id.mapview);
         ImageProvider imageProvider = ImageProvider.fromResource(getContext(),R.drawable.search_result);
         int nightModeFlags =
                 getContext().getResources().getConfiguration().uiMode &
@@ -1057,12 +1026,30 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
         ClusterizedPlacemarkCollection clusterizedCollection = mapview.getMap().getMapObjects().addClusterizedPlacemarkCollection(this);
         List<Point> points = createPoints(objects);
 
+        ArrayList<TypeObject> objectsType = new ArrayList<>();
+
+        XmlPullParser xpp = getContext().getResources().getXml(R.xml.type_object);
+        TypeObjectResourceParser parser = new TypeObjectResourceParser();
+        if (parser.parse(xpp)) {
+            objectsType = parser.getTypeObjects();
+        }
 
         List<Point> geometry = new ArrayList<>();
         for (int i = 0; i < objectAdapter.getItemCount(); ++i) {
             Object object = (Object)objectAdapter.getItem(i);
             String[] pointsObj = null;
             pointsObj = object.getLocation().split(",");
+
+            for (TypeObject objectType : objectsType) {
+                if(object.getType() == objectType.getIdType()) {
+                    Resources resources = getContext().getResources();
+                    final int resourceId = resources.getIdentifier(objectType.getIcon(), "drawable",
+                            getContext().getPackageName());
+                    imageProvider = ImageProvider.fromResource(getContext(), resourceId);
+                    break;
+                }
+            }
+
             PlacemarkMapObject mark = clusterizedCollection.addPlacemark(new Point(Double.valueOf(pointsObj[0]),Double.valueOf(pointsObj[1])), imageProvider, new IconStyle());
             mark.setUserData(new ObjectMapObjectUserData(i, object));
             mark.addTapListener(objectMapObjectTapListener);
@@ -1073,13 +1060,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
         BoundingBox box = BoundingBoxHelper.getBounds(new Polyline(geometry));
         CameraPosition boundingBoxPosition = mapview.getMap().cameraPosition(box);
 
-
-       // CameraPosition cp = new CameraPosition(boundingBoxPosition.getTarget(), boundingBoxPosition.getZoom(), 0, 0);
-
-       // double latitude = cp.getTarget().getLatitude() - 0.2;
-       // double longitude = cp.getTarget().getLongitude() - 0.2;
-       // mapview.getMap().move(new CameraPosition(new Point(latitude, longitude), boundingBoxPosition.getZoom(), 0, 0));
-
         mapview.getMap().move(new CameraPosition(boundingBoxPosition.getTarget(), boundingBoxPosition.getZoom() - 0.5F, 0, 0));
 
         adapter.close();
@@ -1087,7 +1067,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
     }
 
     public void setObjectFavorites(Object selectedObject,int position) {
-        Log.d("setObjectFavorites","setObjectFavorites");
         //добавление либо удаление объекта из избранного
         favorites = settings.getStringSet(PREF_FAVORITES, new HashSet<String>());
 
@@ -1104,23 +1083,20 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
 
         RecyclerView objectsList = (RecyclerView) getView().findViewById(R.id.objectsList);
         ObjectAdapter objectAdapter = (ObjectAdapter)objectsList.getAdapter();
-        //objectAdapter.notifyDataSetChanged();
         objectAdapter.notifyItemChanged(position);
         prefEditor.remove(PREF_FAVORITES);
-        prefEditor.commit();
+        prefEditor.apply();
         prefEditor.putStringSet(PREF_FAVORITES, favorites);
-        prefEditor.commit();
+        prefEditor.apply();
 
     }
     public void setFavorite() {
         //добавление либо удаление объекта из избранного во фрагменте с объектом
-        favorites = settings.getStringSet(PREF_FAVORITES, new HashSet<String>());
+        favorites = settings.getStringSet(PREF_FAVORITES, new HashSet<>());
 
         boolean isAdded = favorites.add(String.valueOf(objectSelected.getId()));
 
         ImageView imgFavorite = (ImageView) getView().findViewById(R.id.imgFavorite);
-
-     //   ImageButton imageButtonFavorite = (ImageButton) getView().findViewById(R.id.imageButtonFavorite);
 
         if (isAdded) {
             Toast.makeText(getActivity().getApplicationContext(), "Объект добавлен в избранное", Toast.LENGTH_SHORT).show();
@@ -1137,9 +1113,9 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
         SharedPreferences.Editor prefEditor = settings.edit();
 
         prefEditor.remove(PREF_FAVORITES);
-        prefEditor.commit();
+        prefEditor.apply();
         prefEditor.putStringSet(PREF_FAVORITES, favorites);
-        prefEditor.commit();
+        prefEditor.apply();
 
         RecyclerView objectsList = (RecyclerView) getView().findViewById(R.id.objectsList);
         ObjectAdapter objectAdapter = (ObjectAdapter)objectsList.getAdapter();
@@ -1148,6 +1124,8 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
     }
 
     public void setClusterized(boolean changeCamera) {
+        // кластеризует объекты на карте
+        // changeCamera - нужно ли сдвигать камеру после кластеризации
         MapView mapview = (MapView) getView().findViewById(R.id.mapview);
         RecyclerView objectsList = (RecyclerView) getView().findViewById(R.id.objectsList);
 
@@ -1157,14 +1135,32 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
         ImageProvider imageProvider = ImageProvider.fromResource(getContext(),R.drawable.search_result);
         mapview.getMap().getMapObjects().clear();
         ClusterizedPlacemarkCollection clusterizedCollection = mapview.getMap().getMapObjects().addClusterizedPlacemarkCollection(this);
-        List<Point> points = createPoints(objects);
 
+        ArrayList<TypeObject> objectsType = new ArrayList<>();
+
+        XmlPullParser xpp = getContext().getResources().getXml(R.xml.type_object);
+        TypeObjectResourceParser parser = new TypeObjectResourceParser();
+        if (parser.parse(xpp)) {
+            objectsType = parser.getTypeObjects();
+        }
 
         List<Point> geometry = new ArrayList<>();
         for (int i = 0; i < objectAdapter.getItemCount(); ++i) {
             Object object = (Object)objectAdapter.getItem(i);
             String[] pointsObj = null;
             pointsObj = object.getLocation().split(",");
+
+            for (TypeObject objectType : objectsType) {
+                if(object.getType() == objectType.getIdType()) {
+                    Resources resources = getContext().getResources();
+                    final int resourceId = resources.getIdentifier(objectType.getIcon(), "drawable",
+                            getContext().getPackageName());
+                    imageProvider = ImageProvider.fromResource(getContext(), resourceId);
+                    break;
+                }
+            }
+            //ImageProvider imageProvider = ImageProvider.fromResource(getContext(),R.drawable.search_result);
+
             PlacemarkMapObject mark = clusterizedCollection.addPlacemark(new Point(Double.valueOf(pointsObj[0]),Double.valueOf(pointsObj[1])), imageProvider, new IconStyle());
             mark.setUserData(new ObjectMapObjectUserData(i, object));
             mark.addTapListener(objectMapObjectTapListener);
@@ -1177,18 +1173,11 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
 
         if (changeCamera) mapview.getMap().move(new CameraPosition(boundingBoxPosition.getTarget(), boundingBoxPosition.getZoom() - 0.5F, 0, 0));
 
-        // CameraPosition cp = new CameraPosition(boundingBoxPosition.getTarget(), boundingBoxPosition.getZoom(), 0, 0);
-
-        // double latitude = cp.getTarget().getLatitude() - 0.2;
-        // double longitude = cp.getTarget().getLongitude() - 0.2;
-        // mapview.getMap().move(new CameraPosition(new Point(latitude, longitude), boundingBoxPosition.getZoom(), 0, 0));
-
-       // mapview.getMap().move(new CameraPosition(boundingBoxPosition.getTarget(), boundingBoxPosition.getZoom() - 0.5F, 0, 0));
-
     }
 
 
    public void setDataObject(Object object,int position) {
+        //отображение данных выбранного объекта
        NestedScrollView nestedScroll = (NestedScrollView) getView().findViewById(R.id.bottom_sheet_scroll);
        nestedScroll.fullScroll(NestedScrollView.FOCUS_UP);
 
@@ -1239,14 +1228,14 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
            }
        };
 
-       try (InputStream inputStream = getContext().getAssets().open(object.getImgUrl())) {
-           Drawable drawable = Drawable.createFromStream(inputStream, null);
-           imageObject.setImageDrawable(drawable);
-
-           imageObject.setOutlineProvider(provider);
-           imageObject.setClipToOutline(true);
-       } catch (IOException e){e.printStackTrace();}
-
+       String imgUrl = "https://around.sourceforge.io/imagesproject/" + object.getId() +".png";
+       if (MainApplication.IMAGE_CACHING) {
+           Picasso.with(getContext()).load(imgUrl).centerCrop().fit().placeholder(R.drawable.progress_animation).error(R.drawable.image_not_found).into(imageObject);
+       } else {
+           Picasso.with(getContext()).load(imgUrl).centerCrop().fit().placeholder(R.drawable.progress_animation).error(R.drawable.image_not_found).memoryPolicy(MemoryPolicy.NO_CACHE, MemoryPolicy.NO_STORE).networkPolicy(NetworkPolicy.NO_CACHE).into(imageObject);
+       }
+       imageObject.setOutlineProvider(provider);
+       imageObject.setClipToOutline(true);
 
        imgAccess.setOutlineProvider(provider);
        imgAccess.setClipToOutline(true);
@@ -1254,9 +1243,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
        boolean isContains = favorites.contains(String.valueOf(object.getId()));
 
        ImageView imgFavorite = getView().findViewById(R.id.imgFavorite);
-       /*if (isContains){
-           imgFavorite.setImageResource(R.drawable.favorite);
-       }*/
 
        if (isContains){
            imgFavorite.setImageResource(R.drawable.favorite);
@@ -1299,8 +1285,8 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
 
     private MapObjectTapListener objectMapObjectTapListener = new MapObjectTapListener() {
         @Override
-        public boolean onMapObjectTap(MapObject mapObject, Point point) {
-            Log.d("onMapObjectTap11","onMapObjectTap11");
+        public boolean onMapObjectTap(@NonNull MapObject mapObject, @NonNull Point point) {
+            //обрабатывает клик по объекту
             if (mapObject instanceof PlacemarkMapObject) {
                 PlacemarkMapObject objectMap = (PlacemarkMapObject)mapObject;
 
@@ -1308,9 +1294,7 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
                 java.lang.Object userData = objectMap.getUserData();
                 if (userData instanceof ObjectMapObjectUserData) {
                     ObjectMapObjectUserData objectMapUserData = (ObjectMapObjectUserData)userData;
-                    Log.d("onMapObjectTap33",objectMapUserData.object.getName());
 
-                    //!!!!!!!!!!!
                     objectSelected = objectMapUserData.object;
                     positionObjectSelected = objectMapUserData.position;
                     ViewFlipper viewFlipper = (ViewFlipper) getView().findViewById(R.id.viewFlipper);
@@ -1325,7 +1309,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
                     }
 
                     setDataObject(objectSelected,positionObjectSelected);
-                    //viewFlipper.setDisplayedChild(0);
                     if (viewFlipper.getDisplayedChild() == 1) {
                         viewFlipper.setInAnimation(getContext(), R.anim.slide_in_right);
                         viewFlipper.setOutAnimation(getContext(), R.anim.slide_out_left);
@@ -1334,11 +1317,7 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
                     FloatingActionButton fabBack = (FloatingActionButton) getView().findViewById(R.id.fabBack);
                     fabBack.setVisibility(View.VISIBLE);
 
-
-
                 }
-
-                Log.d("onMapObjectTap44","onMapObjectTap");
             }
             return true;
         }
@@ -1354,8 +1333,9 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
         }
     }
 
-        private List<Point> createPoints(List<Object>  objects) {
-        ArrayList<Point> points = new ArrayList<Point>();
+    private List<Point> createPoints(List<Object>  objects) {
+        //заполняет список координатоми объектов
+        ArrayList<Point> points = new ArrayList<>();
 
         for(Object object : objects) {
 
@@ -1364,15 +1344,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
             points.add(new Point(Double.valueOf(pointsObj[0]),Double.valueOf(pointsObj[1])));
 
         }
-/*
-        for (int i = 0; i < count; ++i) {
-            Point clusterCenter = CLUSTER_CENTERS.get(random.nextInt(CLUSTER_CENTERS.size()));
-            double latitude = clusterCenter.getLatitude() + Math.random() - 0.5;
-            double longitude = clusterCenter.getLongitude() + Math.random() - 0.5;
-
-            points.add(new Point(latitude, longitude));
-        }
-*/
         return points;
     }
 
@@ -1386,13 +1357,7 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
     }
 
     @Override
-    public boolean onClusterTap(Cluster cluster) {
-       /* Toast.makeText(
-                getApplicationContext(),
-                String.format(getString(R.string.cluster_tap_message), cluster.getSize()),
-                Toast.LENGTH_SHORT).show();
-*/
-        Log.d("onClusterTap","onClusterTap");
+    public boolean onClusterTap(@NonNull Cluster cluster) {
         // We return true to notify map that the tap was handled and shouldn't be
         // propagated further.
         return true;
@@ -1400,10 +1365,10 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
 
     private int getHeightOfView(View contentview) {
         contentview.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
-        //contentview.getMeasuredWidth();
         return contentview.getMeasuredHeight();
     }
     public void setDriving() {
+        //запрос маршрута для автомобилей
         CoordinatorLayout coordinatorLayout = (CoordinatorLayout) getView().findViewById(R.id.coordinatorLayout);
         coordinatorLayout.animate().translationY(getHeightOfView(coordinatorLayout)).setInterpolator(new AccelerateInterpolator(2)).start();
 
@@ -1421,6 +1386,7 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
     }
 
     public void setPedestrian() {
+        //запрос маршрута для пешеходов
         CoordinatorLayout coordinatorLayout = (CoordinatorLayout) getView().findViewById(R.id.coordinatorLayout);
         coordinatorLayout.animate().translationY(getHeightOfView(coordinatorLayout)).setInterpolator(new AccelerateInterpolator(2)).start();
 
@@ -1432,7 +1398,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
                 mapview.getMap().getMapObjects().remove(mapObjects);
             }
 
-            //ROUTE_START_LOCATION = userLocationLayer.cameraPosition().getTarget();
             pedestrianRouter = TransportFactory.getInstance().createPedestrianRouter();
             mapObjects = mapview.getMap().getMapObjects().addCollection();
             submitRequestPedestrian();
@@ -1440,6 +1405,7 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
     }
 
     public void setMasstransit() {
+        //запрос маршрута для общественного транспорта
         CoordinatorLayout coordinatorLayout = (CoordinatorLayout) getView().findViewById(R.id.coordinatorLayout);
         coordinatorLayout.animate().translationY(getHeightOfView(coordinatorLayout)).setInterpolator(new AccelerateInterpolator(2)).start();
 
@@ -1451,7 +1417,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
                 mapview.getMap().getMapObjects().remove(mapObjects);
             }
 
-            //ROUTE_START_LOCATION = userLocationLayer.cameraPosition().getTarget();
             masstransitRouter = TransportFactory.getInstance().createMasstransitRouter();
             mapObjects = mapview.getMap().getMapObjects().addCollection();
             submitRequestMasstransit();
@@ -1460,11 +1425,8 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
 
 
     @Override
-    public void onDrivingRoutes(List<DrivingRoute> routes) {
-       /* for (DrivingRoute route : routes) {
-            mapObjects.addPolyline(route.getGeometry());
-        }
-        */
+    public void onDrivingRoutes(@NonNull List<DrivingRoute> routes) {
+        //получает маршрут для автомобилистов
         ProgressBar progressBar = getView().findViewById(R.id.progressBar);
         progressBar.setVisibility(View.INVISIBLE);
         if (routes != null && !routes.isEmpty()) {
@@ -1491,7 +1453,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
             MapView mapview = getView().findViewById(R.id.mapview);
             BoundingBox box = BoundingBoxHelper.getBounds(routes.get(0).getGeometry());
             CameraPosition boundingBoxPosition = mapview.getMap().cameraPosition(box);
-           // mapview.getMap().move(new CameraPosition(boundingBoxPosition.getTarget(), boundingBoxPosition.getZoom() - 0.8F, 0, 0));
 
 
             mapview.getMap().move(
@@ -1499,11 +1460,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
                     new Animation(Animation.Type.SMOOTH, 1),
                     null);
 
-            /*BoundingBox boundingBox= new BoundingBox(ROUTE_START_LOCATION,ROUTE_END_LOCATION);
-            CameraPosition boundingBoxPosition = mapview.getMap().cameraPosition(boundingBox);
-
-            mapview.getMap().move(new CameraPosition(boundingBoxPosition.getTarget(), boundingBoxPosition.getZoom() - 0.8F, 0, 0));
-*/
         }else {
             FloatingActionButton fabDriving = getView().findViewById(R.id.fabDriving);
             fabDriving.setBackgroundTintList(AppCompatResources.getColorStateList(getContext(), R.color.fab_not_selected));
@@ -1512,9 +1468,8 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
         }
     }
     @Override
-    public void onDrivingRoutesError(Error error) {
-        Log.d("Error onDrivingRoutesError","Error onDrivingRoutesError");
-
+    public void onDrivingRoutesError(@NonNull Error error) {
+        //получает ошибку запроса маршрутов для автомобилистов
         CardView viewRoute = (CardView)getView().findViewById(R.id.viewRoute);
         viewRoute.setVisibility(View.GONE);
 
@@ -1524,16 +1479,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
         FloatingActionButton fabDriving = getView().findViewById(R.id.fabDriving);
         fabDriving.setBackgroundTintList(AppCompatResources.getColorStateList(getContext(), R.color.fab_not_selected));
 
-    /*    String errorMessage = getString(R.string.unknown_error_message);
-        if (error instanceof RemoteError) {
-            errorMessage = getString(R.string.remote_error_message);
-        } else if (error instanceof NetworkError) {
-            errorMessage = getString(R.string.network_error_message);
-        }
-
-        Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
-
-      */
     }
     private String getVehicleType(Transport transport, HashSet<String> knownVehicleTypes) {
         // A public transport line may have a few 'vehicle types' associated with it
@@ -1609,8 +1554,8 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
         }
     }
     @Override
-    public void onMasstransitRoutes(List<Route> routes) {
-
+    public void onMasstransitRoutes(@NonNull List<Route> routes) {
+        //получает маршрут для пешеходов и общественного транспорта
         ProgressBar progressBar = getView().findViewById(R.id.progressBar);
         progressBar.setVisibility(View.INVISIBLE);
         if (isMasstransitRouter) {
@@ -1632,8 +1577,6 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
 
                 TextView textDistance = getView().findViewById(R.id.textDistance);
                 textDistance.setVisibility(View.GONE);
-                //String textDistanceStr = "Расстояние: " + routes.get(0).getMetadata().getWeight().getWalkingDistance().getText();
-                //textDistance.setText(textDistanceStr);
 
                 TextView textTime = getView().findViewById(R.id.textTime);
                 String textTimeStr = "Время: " + routes.get(0).getMetadata().getWeight().getTime().getText();
@@ -1657,15 +1600,12 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
         } else {
 
             if (routes != null && !routes.isEmpty()) {
-                //PolylineMapObject polylineMapObject = routes.get(0).getWayPoints()getGeometry();
-                // mapObjects.addPolyline(routes.get(0).getWayPoints());
 
                 PolylineMapObject polylineMapObject = mapObjects.addPolyline(routes.get(0).getGeometry());
                 polylineMapObject.setStrokeColor(0xFF09692b);
                 polylineMapObject.setDashLength(10.0F);
                 polylineMapObject.setGapLength(10.0F);
 
-                //mapObjects.addPolyline(routes.get(0).getGeometry());
                 TextView textDistance = getView().findViewById(R.id.textDistance);
                 textDistance.setVisibility(View.VISIBLE);
                 String textDistanceStr = "Расстояние: " + routes.get(0).getMetadata().getWeight().getWalkingDistance().getText();
@@ -1701,8 +1641,8 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
     }
 
     @Override
-    public void onMasstransitRoutesError(Error error) {
-
+    public void onMasstransitRoutesError(@NonNull Error error) {
+        //получает ошибку при запросе маршрутов пешехода и общественного транспорта
         ProgressBar progressBar = getView().findViewById(R.id.progressBar);
         progressBar.setVisibility(View.INVISIBLE);
 
@@ -1717,6 +1657,7 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
 
     }
     private void submitRequest() {
+        //отправляет запрос на авто маршрут
         DrivingOptions drivingOptions = new DrivingOptions();
         VehicleOptions vehicleOptions = new VehicleOptions();
         ArrayList<RequestPoint> requestPoints = new ArrayList<>();
@@ -1732,6 +1673,7 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
     }
 
     private void submitRequestPedestrian() {
+        //отправляет запрос на пешеходный маршрут
         ArrayList<RequestPoint> requestPoints = new ArrayList<>();
         requestPoints.add(new RequestPoint(
                 ROUTE_START_LOCATION,
@@ -1745,6 +1687,7 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
     }
 
     private void submitRequestMasstransit() {
+        //отправляет запрос на маршрут общественного транспорта
         ArrayList<RequestPoint> requestPoints = new ArrayList<>();
         requestPoints.add(new RequestPoint(
                 ROUTE_START_LOCATION,

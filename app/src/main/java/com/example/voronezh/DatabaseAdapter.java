@@ -1,16 +1,11 @@
 package com.example.voronezh;
 
-import android.content.ContentValues;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.database.Cursor;
-import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
-import android.util.Log;
 
-import com.yandex.mapkit.geometry.Point;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -42,6 +37,7 @@ public class DatabaseAdapter {
     }
 
     public List<Object> getGlobalObjectsFilter(String filter){
+        // возвращает список объектов соотвествующих фильтру filter, поиск идет по всей базе
         ArrayList<Object> objects = new ArrayList<>();
 
         String[] strParam = null;
@@ -86,6 +82,8 @@ public class DatabaseAdapter {
     }
 
     public List<Object> getObjectsFilter(int typeObject,String filter,boolean isAccess){
+        // возвращает список объектов соотвествующих фильтру filter, поиск идет с учетом типа объекта typeObject
+        // и наличия доступной среды isAccess
         ArrayList<Object> objects = new ArrayList<>();
 
         //массив параметров передающихся в запрос
@@ -139,7 +137,6 @@ public class DatabaseAdapter {
             String website = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_WEBSITE));
             int environ = cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_ENVIRON));
             int type = cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_TYPE));
-            //Log.d("name",name);
             objects.add(new Object(id,name,address,description,environ,location,type,phone,email,website));
         }
         cursor.close();
@@ -147,6 +144,8 @@ public class DatabaseAdapter {
     }
 
     public List<Object> getObjects(int typeObject,boolean isAccess){
+        // возвращает список объектов с учетом типа объекта typeObject
+        // и наличия доступной среды isAccess
         ArrayList<Object> objects = new ArrayList<>();
         Cursor cursor;
         if(!isAccess) {
@@ -175,6 +174,7 @@ public class DatabaseAdapter {
     }
 
     public List<Object> getObjectsFavorite(){
+        // возвращает список объектов которые находятся в избранном
         ArrayList<Object> objects = new ArrayList<>();
 
         settings = context.getSharedPreferences(PREFS_FILE, context.MODE_PRIVATE);
@@ -190,7 +190,6 @@ public class DatabaseAdapter {
                 str_q += ", ?";
             }
         }
-        //favotitesArray.length
         Cursor cursor;
         String strQuery = "SELECT * FROM %s WHERE %s in (" + str_q +")";
         String query = String.format(strQuery, DatabaseHelper.TABLE, DatabaseHelper.COLUMN_ID);
@@ -207,7 +206,6 @@ public class DatabaseAdapter {
             String website = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_WEBSITE));
             int environ = cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_ENVIRON));
             int type = cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_TYPE));
-            // Log.d("name",name);
             objects.add(new Object(id,name,address,description,environ,location,type,phone,email,website));
         }
 
@@ -215,6 +213,7 @@ public class DatabaseAdapter {
     }
 
     public List<Object> getObjectsSearch(){
+        // возвращает список всех объектов в базе
         ArrayList<Object> objects = new ArrayList<>();
         Cursor cursor;
 
@@ -238,40 +237,5 @@ public class DatabaseAdapter {
         cursor.close();
         return  objects;
     }
-    /*
-
-    public User getUser(long id){
-        User user = null;
-        String query = String.format("SELECT * FROM %s WHERE %s=?",DatabaseHelper.TABLE, DatabaseHelper.COLUMN_ID);
-        Cursor cursor = database.rawQuery(query, new String[]{ String.valueOf(id)});
-        if(cursor.moveToFirst()){
-            String name = cursor.getString(cursor.getColumnIndex(DatabaseHelper.COLUMN_NAME));
-            int year = cursor.getInt(cursor.getColumnIndex(DatabaseHelper.COLUMN_YEAR));
-            user = new User(id, name, year);
-        }
-        cursor.close();
-        return  user;
-    }
-
-    private Cursor getAllEntries(){
-        String[] columns = new String[] {DatabaseHelper.COLUMN_ID, DatabaseHelper.COLUMN_NAME, DatabaseHelper.COLUMN_YEAR};
-        return  database.query(DatabaseHelper.TABLE, columns, null, null, null, null, null);
-    }
-
-    public List<User> getUsers(){
-        ArrayList<User> users = new ArrayList<>();
-        Cursor cursor = getAllEntries();
-        while (cursor.moveToNext()){
-            int id = cursor.getInt(cursor.getColumnIndex(DatabaseHelper.COLUMN_ID));
-            String name = cursor.getString(cursor.getColumnIndex(DatabaseHelper.COLUMN_NAME));
-            int year = cursor.getInt(cursor.getColumnIndex(DatabaseHelper.COLUMN_YEAR));
-            users.add(new User(id, name, year));
-        }
-        cursor.close();
-        return  users;
-    }
-
-
-     */
 
 }

@@ -2,25 +2,19 @@ package com.example.voronezh;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.content.res.AppCompatResources;
 import androidx.cardview.widget.CardView;
-import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.core.view.ViewCompat;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
-import android.content.res.ColorStateList;
 import android.content.res.Configuration;
-import android.content.res.TypedArray;
-import android.graphics.Color;
 import android.graphics.PointF;
 import android.location.Location;
 import android.location.LocationManager;
@@ -28,9 +22,7 @@ import android.os.Bundle;
 import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
-import android.util.TypedValue;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -58,9 +50,6 @@ import com.yandex.mapkit.geometry.BoundingBox;
 import com.yandex.mapkit.geometry.BoundingBoxHelper;
 import com.yandex.mapkit.geometry.Polyline;
 import com.yandex.mapkit.geometry.SubpolylineHelper;
-import com.yandex.mapkit.logo.Alignment;
-import com.yandex.mapkit.logo.HorizontalAlignment;
-import com.yandex.mapkit.logo.VerticalAlignment;
 import com.yandex.mapkit.map.CameraPosition;
 import com.yandex.mapkit.map.IconStyle;
 import com.yandex.mapkit.map.MapObjectCollection;
@@ -108,17 +97,13 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         setContentView(R.layout.activity_map_object);
 
         Bundle arguments = getIntent().getExtras();
         Object object;
         if(arguments!=null) {
             object = (Object) arguments.getSerializable(Object.class.getSimpleName());
-
-            Log.d("NAME::", object.getName());
-            //textView.setText("Name: " + user.getName() + "\nCompany: " + user.getCompany() +
-            //       "\nAge: " + String.valueOf(user.getAge()));
-
 
             //получение координат для отрисовки на карте из Object
             String[] points = null;
@@ -128,6 +113,7 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
 
             mapview = findViewById(R.id.mapview);
 
+            //проверка какая тема день/ночь, установка светлой/темной темы для карты
             int nightModeFlags =
                     getApplicationContext().getResources().getConfiguration().uiMode &
                             Configuration.UI_MODE_NIGHT_MASK;
@@ -147,12 +133,11 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
             istyle.setAnchor(new PointF(0.5f, 1.0f));
             PlacemarkMapObject mark = mapview.getMap().getMapObjects().addPlacemark(pointObject, ImageProvider.fromResource(this, R.drawable.lable));
             mark.setIconStyle(istyle);
-            //установка логотипа яндекс в правый верхний угол
-            //mapview.getMap().getLogo().setAlignment(new Alignment(HorizontalAlignment.LEFT, VerticalAlignment.TOP));
 
             TextView textNameAppBar = findViewById(R.id.textNameAppBar);
             textNameAppBar.setText(object.getName());
 
+            //кнопка назад в список объектов
             ImageButton imageButtonBack = findViewById(R.id.imageButtonBack);
             imageButtonBack.setOnClickListener(new View.OnClickListener()
             {
@@ -175,7 +160,6 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
         fabUserLocation.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Log.d("FAB", "User Location");
                 mapview.getMap().move(
                         new CameraPosition(ROUTE_START_LOCATION, 16.0f, 0.0f, 0.0f),
                         new Animation(Animation.Type.SMOOTH, 1),
@@ -246,19 +230,14 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
             public void onClick(View v) {
                 if(!isVisibilityButtonsRoute) {
                     fabRoute.setImageDrawable(ContextCompat.getDrawable(getApplicationContext(), R.drawable.close));
-                  //  fabDriving.setBackgroundTintList(AppCompatResources.getColorStateList(getApplicationContext(), R.color.fab_not_selected));
                     fabDriving.setVisibility(View.VISIBLE);
                     fabDriving.animate().scaleX(1).scaleY(1).setDuration(300).start();
                     fabDriving.setClickable(true);
 
-
-                 //   fabPedestrian.setBackgroundTintList(AppCompatResources.getColorStateList(getApplicationContext(), R.color.fab_not_selected));
                     fabPedestrian.setVisibility(View.VISIBLE);
                     fabPedestrian.animate().scaleX(1).scaleY(1).setDuration(300).start();
                     fabPedestrian.setClickable(true);
 
-
-                //    fabMasstransit.setBackgroundTintList(AppCompatResources.getColorStateList(getApplicationContext(), R.color.fab_not_selected));
                     fabMasstransit.setVisibility(View.VISIBLE);
                     fabMasstransit.animate().scaleX(1).scaleY(1).setDuration(300).start();
                     fabMasstransit.setClickable(true);
@@ -279,13 +258,9 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
                     fabMasstransit.setClickable(false);
 
                     isVisibilityButtonsRoute = false;
-                   // fabDriving.setVisibility(View.GONE);
                 }
-               // setDriving();
             }
         });
-
-
 
 
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
@@ -301,24 +276,14 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
                 viewRoute.setVisibility(View.GONE);
             }
         });
-        // method to get the location
+        // получение положения пользователя на карте
         getLastLocation();
 
-      /*  CardView viewRoute = findViewById(R.id.viewRoute);
-        SwipeDismissBehavior swipeDismissBehavior = new SwipeDismissBehavior();
-        swipeDismissBehavior.setSwipeDirection(SwipeDismissBehavior.SWIPE_DIRECTION_ANY);//Swipe direction i.e any direction, here you can put any direction LEFT or RIGHT
-
-        CoordinatorLayout.LayoutParams layoutParams =
-                (CoordinatorLayout.LayoutParams) viewRoute.getLayoutParams();
-
-        layoutParams.setBehavior(swipeDismissBehavior);
-
-       */
-
+        //устанавливаем свайп для карточки с данными маршрута
         CardView viewRoute = findViewById(R.id.viewRoute);
         final SwipeDismissBehavior<CardView> swipe = new SwipeDismissBehavior<CardView>() {
             @Override
-            public boolean canSwipeDismissView (View view)
+            public boolean canSwipeDismissView (@NonNull View view)
             {
                 return view == viewRoute;
             }
@@ -328,9 +293,7 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
 
         swipe.setListener(
                 new SwipeDismissBehavior.OnDismissListener() {
-                    @Override public void onDismiss(View view) {
-                        Log.d("onDismiss","onDismiss");
-                    }
+                    @Override public void onDismiss(View view) {}
                     @Override
                     public void onDragStateChanged(int state) {}
 
@@ -339,8 +302,6 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
         CoordinatorLayout.LayoutParams coordinatorParams = (CoordinatorLayout.LayoutParams) viewRoute.getLayoutParams();
 
         coordinatorParams.setBehavior(swipe);
-
-
 
     }
 
@@ -355,9 +316,7 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
                         if (location == null) {
                             requestNewLocationData();
                         } else {
-
-                            Log.d("onComplete getLastLocation : ", String.valueOf(location.getLatitude()) + " " + String.valueOf(location.getLongitude()));
-
+                            // установка маркера положения пользователя на карте
                             ROUTE_START_LOCATION = new Point(location.getLatitude(),location.getLongitude());
                             IconStyle istyle= new IconStyle();
                             istyle.setAnchor(new PointF(0.5f,1.0f));
@@ -369,13 +328,10 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
                             markUserObject.setIconStyle(istyle);
                             markUserObject.setZIndex(5);
 
-                            // latitudeTextView.setText(location.getLatitude() + "");
-                            // longitTextView.setText(location.getLongitude() + "");
                         }
                     }
                 });
             } else {
-                // Toast.makeText(this, "Please turn on" + " your location...", Toast.LENGTH_LONG).show();
                 Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
                 startActivity(intent);
             }
@@ -388,7 +344,6 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
 
     @SuppressLint("MissingPermission")
     private void requestNewLocationData() {
-
         // Initializing LocationRequest
         // object with appropriate methods
         LocationRequest mLocationRequest = new LocationRequest();
@@ -417,14 +372,13 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
         }
     }
 
-    private LocationCallback mLocationCallback = new LocationCallback() {
+    private final LocationCallback mLocationCallback = new LocationCallback() {
 
         @Override
         public void onLocationResult(LocationResult locationResult) {
             Location mLastLocation = locationResult.getLastLocation();
-            Log.d("onLocationResult : ", String.valueOf(mLastLocation.getLatitude()) + " " + String.valueOf(mLastLocation.getLongitude()));
+            //установка маркера положения пользователя на карте
             ROUTE_START_LOCATION = new Point(mLastLocation.getLatitude(),mLastLocation.getLongitude());
-
             IconStyle istyle= new IconStyle();
             istyle.setAnchor(new PointF(0.5f,1.0f));
             MapView mapview = findViewById(R.id.mapview);
@@ -436,10 +390,6 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
                 markUserObject.setIconStyle(istyle);
                 markUserObject.setZIndex(5);
             }
-
-            //setUserLayer(ROUTE_START_LOCATION);
-            // latitudeTextView.setText("Latitude: " + mLastLocation.getLatitude() + "");
-            // longitTextView.setText("Longitude: " + mLastLocation.getLongitude() + "");
         }
     };
 
@@ -479,7 +429,7 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
     }
 
     public void setDriving() {
-
+        //запрос маршрута для автомобилей
         if (ROUTE_START_LOCATION != null) {
             MapView mapview = findViewById(R.id.mapview);
 
@@ -487,7 +437,6 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
                 mapview.getMap().getMapObjects().remove(mapObjects);
             }
 
-            //ROUTE_START_LOCATION = userLocationLayer.cameraPosition().getTarget();
             drivingRouter = DirectionsFactory.getInstance().createDrivingRouter();
             mapObjects = mapview.getMap().getMapObjects().addCollection();
             submitRequest();
@@ -495,7 +444,7 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
     }
 
     public void setPedestrian() {
-
+        //запрос маршрута для пешеходов
         if (ROUTE_START_LOCATION != null) {
             isMasstransitRouter = false;
             MapView mapview = findViewById(R.id.mapview);
@@ -504,7 +453,6 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
                 mapview.getMap().getMapObjects().remove(mapObjects);
             }
 
-            //ROUTE_START_LOCATION = userLocationLayer.cameraPosition().getTarget();
             pedestrianRouter = TransportFactory.getInstance().createPedestrianRouter();
             mapObjects = mapview.getMap().getMapObjects().addCollection();
             submitRequestPedestrian();
@@ -512,7 +460,7 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
     }
 
     public void setMasstransit() {
-
+        //запрос маршрута для общественного транспорта
         if (ROUTE_START_LOCATION != null) {
             isMasstransitRouter = true;
             MapView mapview = findViewById(R.id.mapview);
@@ -520,8 +468,6 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
             if (mapObjects != null) {
                 mapview.getMap().getMapObjects().remove(mapObjects);
             }
-
-            //ROUTE_START_LOCATION = userLocationLayer.cameraPosition().getTarget();
             masstransitRouter = TransportFactory.getInstance().createMasstransitRouter();
             mapObjects = mapview.getMap().getMapObjects().addCollection();
             submitRequestMasstransit();
@@ -596,14 +542,14 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
         } else {
             // This is not a public transport ride section
             // In this example let us draw it in black
-            polylineMapObject.setStrokeColor(0xFF09692b);  // Black
+            polylineMapObject.setStrokeColor(0xFF09692b);  // Green
             polylineMapObject.setDashLength(10.0F);
             polylineMapObject.setGapLength(10.0F);
         }
     }
     @Override
-    public void onMasstransitRoutes(List<Route> routes) {
-
+    public void onMasstransitRoutes(@NonNull List<Route> routes) {
+        //получает маршрут для пешеходов и общественного транспорта
         ProgressBar progressBar = findViewById(R.id.progressBar);
         progressBar.setVisibility(View.INVISIBLE);
         if (isMasstransitRouter) {
@@ -625,8 +571,6 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
 
                 TextView textDistance = findViewById(R.id.textDistance);
                 textDistance.setVisibility(View.GONE);
-                //String textDistanceStr = "Расстояние: " + routes.get(0).getMetadata().getWeight().getWalkingDistance().getText();
-                //textDistance.setText(textDistanceStr);
 
                 TextView textTime = findViewById(R.id.textTime);
                 String textTimeStr = "Время: " + routes.get(0).getMetadata().getWeight().getTime().getText();
@@ -650,15 +594,12 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
         } else {
 
             if (routes != null && !routes.isEmpty()) {
-                //PolylineMapObject polylineMapObject = routes.get(0).getWayPoints()getGeometry();
-                // mapObjects.addPolyline(routes.get(0).getWayPoints());
 
                 PolylineMapObject polylineMapObject = mapObjects.addPolyline(routes.get(0).getGeometry());
                 polylineMapObject.setStrokeColor(0xFF09692b);
                 polylineMapObject.setDashLength(10.0F);
                 polylineMapObject.setGapLength(10.0F);
 
-                //mapObjects.addPolyline(routes.get(0).getGeometry());
                 TextView textDistance = findViewById(R.id.textDistance);
                 textDistance.setVisibility(View.VISIBLE);
                 String textDistanceStr = "Расстояние: " + routes.get(0).getMetadata().getWeight().getWalkingDistance().getText();
@@ -694,8 +635,8 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
     }
 
     @Override
-    public void onMasstransitRoutesError(Error error) {
-
+    public void onMasstransitRoutesError(@NonNull Error error) {
+        //получает ошибку при запросе маршрутов пешехода и общественного транспорта
         ProgressBar progressBar = findViewById(R.id.progressBar);
         progressBar.setVisibility(View.INVISIBLE);
 
@@ -711,11 +652,8 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
     }
 
     @Override
-    public void onDrivingRoutes(List<DrivingRoute> routes) {
-       /* for (DrivingRoute route : routes) {
-            mapObjects.addPolyline(route.getGeometry());
-        }
-        */
+    public void onDrivingRoutes(@NonNull List<DrivingRoute> routes) {
+       //получает маршрут для автомобилистов
         ProgressBar progressBar = findViewById(R.id.progressBar);
         progressBar.setVisibility(View.INVISIBLE);
         if (routes != null && !routes.isEmpty()) {
@@ -746,12 +684,6 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
                     new Animation(Animation.Type.SMOOTH, 1),
                     null);
 
-
-            /*BoundingBox boundingBox= new BoundingBox(ROUTE_START_LOCATION,ROUTE_END_LOCATION);
-            CameraPosition boundingBoxPosition = mapview.getMap().cameraPosition(boundingBox);
-
-            mapview.getMap().move(new CameraPosition(boundingBoxPosition.getTarget(), boundingBoxPosition.getZoom() - 0.8F, 0, 0));
-*/
         } else {
             FloatingActionButton fabDriving = findViewById(R.id.fabDriving);
             fabDriving.setBackgroundTintList(AppCompatResources.getColorStateList(getApplicationContext(), R.color.fab_not_selected));
@@ -760,27 +692,17 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
         }
     }
     @Override
-    public void onDrivingRoutesError(Error error) {
-        Log.d("Error onDrivingRoutesError","Error onDrivingRoutesError");
+    public void onDrivingRoutesError(@NonNull Error error) {
+        //получает ошибку запроса маршрутов для автомобилистов
         ProgressBar progressBar = findViewById(R.id.progressBar);
         progressBar.setVisibility(View.INVISIBLE);
 
         FloatingActionButton fabDriving = findViewById(R.id.fabDriving);
         fabDriving.setBackgroundTintList(AppCompatResources.getColorStateList(getApplicationContext(), R.color.fab_not_selected));
-
-    /*    String errorMessage = getString(R.string.unknown_error_message);
-        if (error instanceof RemoteError) {
-            errorMessage = getString(R.string.remote_error_message);
-        } else if (error instanceof NetworkError) {
-            errorMessage = getString(R.string.network_error_message);
-        }
-
-        Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
-
-      */
     }
 
     private void submitRequest() {
+        //отправляет запрос на авто маршрут
         DrivingOptions drivingOptions = new DrivingOptions();
         VehicleOptions vehicleOptions = new VehicleOptions();
         ArrayList<RequestPoint> requestPoints = new ArrayList<>();
@@ -796,6 +718,7 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
     }
 
     private void submitRequestPedestrian() {
+        //отправляет запрос на пешеходный маршрут
         ArrayList<RequestPoint> requestPoints = new ArrayList<>();
         requestPoints.add(new RequestPoint(
                 ROUTE_START_LOCATION,
@@ -809,6 +732,7 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
     }
 
     private void submitRequestMasstransit() {
+        //отправляет запрос на маршрут общественного транспорта
         ArrayList<RequestPoint> requestPoints = new ArrayList<>();
         requestPoints.add(new RequestPoint(
                 ROUTE_START_LOCATION,
@@ -822,9 +746,6 @@ public class MapObjectActivity extends AppCompatActivity implements  DrivingSess
 
         masstransitSession = masstransitRouter.requestRoutes(requestPoints, options, this);
 
-       // masstransitRouter.requestRoutes(ROUTE_START_LOCATION, ROUTE_END_LOCATION,
-        //        new TransitOptions(new ArrayList<String>(), new TimeOptions()),
-         //       this);
     }
 
 }

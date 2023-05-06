@@ -8,6 +8,7 @@ public class TypeObject implements Serializable {
     private String nameTypeUppercase; // название типа большими буквами
     private int idType;  // id типа
     private String imgResource; // изображение
+    private String icon; // изображение icon
     private int heightImg; // высота изображения
 
     public String getName() {
@@ -48,6 +49,13 @@ public class TypeObject implements Serializable {
 
     public void setImgResource(String img) {
         this.imgResource = img;
+    }
+    public String getIcon() {
+        return this.icon;
+    }
+
+    public void setIcon(String img) {
+        this.icon = img;
     }
 
 }

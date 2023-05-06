@@ -1,41 +1,24 @@
 package com.example.voronezh;
 
-import android.Manifest;
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
+import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.graphics.Outline;
-import android.graphics.PointF;
 import android.graphics.PorterDuff;
-import android.graphics.drawable.Drawable;
-import android.location.Location;
-import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
 
-//import android.app.Fragment;
-import androidx.annotation.NonNull;
-import androidx.appcompat.widget.Toolbar;
 import androidx.constraintlayout.widget.ConstraintLayout;
-import androidx.coordinatorlayout.widget.CoordinatorLayout;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
-import android.os.Looper;
-import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
-import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -44,50 +27,18 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.core.widget.NestedScrollView;
+import androidx.viewpager.widget.ViewPager;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationCallback;
-import com.google.android.gms.location.LocationResult;
-import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
 import com.google.android.material.appbar.AppBarLayout;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.tabs.TabLayout;
+import com.squareup.picasso.MemoryPolicy;
+import com.squareup.picasso.NetworkPolicy;
 import com.squareup.picasso.Picasso;
-import com.yandex.mapkit.Animation;
-import com.yandex.mapkit.MapKit;
-import com.yandex.mapkit.MapKitFactory;
-import com.yandex.mapkit.RequestPoint;
-import com.yandex.mapkit.RequestPointType;
-import com.yandex.mapkit.directions.DirectionsFactory;
-import com.yandex.mapkit.directions.driving.DrivingOptions;
-import com.yandex.mapkit.directions.driving.DrivingRoute;
-import com.yandex.mapkit.directions.driving.DrivingRouter;
-import com.yandex.mapkit.directions.driving.DrivingSession;
-import com.yandex.mapkit.directions.driving.VehicleOptions;
-import com.yandex.mapkit.geometry.BoundingBox;
-import com.yandex.mapkit.geometry.BoundingBoxHelper;
-import com.yandex.mapkit.geometry.Point;
-import com.yandex.mapkit.layers.ObjectEvent;
-import com.yandex.mapkit.logo.Alignment;
-import com.yandex.mapkit.logo.HorizontalAlignment;
-import com.yandex.mapkit.logo.VerticalAlignment;
-import com.yandex.mapkit.map.CameraPosition;
-import com.yandex.mapkit.map.IconStyle;
-import com.yandex.mapkit.map.MapObjectCollection;
-import com.yandex.mapkit.map.PlacemarkMapObject;
-import com.yandex.mapkit.mapview.MapView;
-import com.yandex.mapkit.user_location.UserLocationView;
-import com.yandex.runtime.Error;
-import com.yandex.runtime.image.ImageProvider;
 
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
 import java.net.IDN;
 import java.util.ArrayList;
 
@@ -98,36 +49,36 @@ import java.net.URL;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.TimerTask;
 
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
-/**
- * A simple {@link Fragment} subclass.
- * Use the {@link ObjectFragment#newInstance} factory method to
- * create an instance of this fragment.
- */
-public class ObjectFragment extends Fragment implements  DrivingSession.DrivingRouteListener {
+public class ObjectFragment extends Fragment  {
     private Object object;
     Set<String> favorites;
     SharedPreferences settings;
     private static final String PREFS_FILE = "Account";
     private static final String PREF_FAVORITES = "Favorites";
-    private static final int PERMISSIONS_REQUEST_FINE_LOCATION = 1;
 
-    private MapObjectCollection mapObjects = null;
-    private DrivingRouter drivingRouter;
-    private DrivingSession drivingSession;
-    private  Point ROUTE_START_LOCATION = null;
-    private  Point ROUTE_END_LOCATION;
-    FusedLocationProviderClient mFusedLocationClient;
-    int PERMISSION_ID = 44;
-    PlacemarkMapObject markUserObject = null;
+    ViewPager page ;
+    TabLayout tabLayout;
+    List<SlideItemsModelClass> listItems;
 
+    java.util.Timer timer = null;
 
+    APIRetrofitInterface apiInterface;
     interface OnFragmentSendDataObjectListener {
+        //сообщает что пользователь нажал кнопку назад
         void onSendDataObjectBack();
+        //получает данные по объекту из MainActivity
         Object onGetDataObject();
+        //сообщает что нужно обновить список объектов в ListFragment
         void onUpdateListObjects();
+        //сообщает MainActivity о добавлении объекта в избранное
         void onAddObjectFavorite(Object object);
+        //сообщает MainActivity об удалении объекта из избранного
         void onRemoveObjectFavorite();
     }
 
@@ -139,6 +90,7 @@ public class ObjectFragment extends Fragment implements  DrivingSession.DrivingR
 
     public static boolean urlValidator(String url)
     {
+        //проверяет что url рабочий
         try {
             new URL(url).toURI();
             return true;
@@ -159,19 +111,7 @@ public class ObjectFragment extends Fragment implements  DrivingSession.DrivingR
         NestedScrollView nestedScroll = (NestedScrollView) getView().findViewById(R.id.bottom_sheet_scroll);
         nestedScroll.fullScroll(NestedScrollView.FOCUS_UP);
 
-/*
-        Log.d("LOG::",object.getDescription());
-        String s1 = object.getDescription();
-        char[] chars = new char[s1.length()];
-        for (int i = 0; i < s1.length(); i++) {
-            chars[i] = s1.charAt(i);
-            int n = Character.getNumericValue(chars[i]);
-            Log.d("Character:",String.valueOf((int)chars[i]));
-            Log.d("Character:",String.valueOf(chars[i]));
-        }
-*/
-
-        ImageView imageObject = (ImageView) getView().findViewById(R.id.imageObject);
+       // ImageView imageObject = (ImageView) getView().findViewById(R.id.imageObject);
 
         TextView textName = (TextView) getView().findViewById(R.id.textName);
         TextView textAddress = (TextView) getView().findViewById(R.id.textAddress);
@@ -203,17 +143,7 @@ public class ObjectFragment extends Fragment implements  DrivingSession.DrivingR
         if(object.getWebsite().isEmpty() || !urlValidator(object.getWebsite())) {
             relativeLayoutWebsite.setVisibility(View.GONE);
         }
-/*
-        ImageButton imageButtonEmail = (ImageButton) getView().findViewById(R.id.imageButtonEmail);
 
-        if(object.getEmail().isEmpty()) {
-            imageButtonEmail.setVisibility(View.GONE);
-        } else {
-            if (imageButtonEmail.getVisibility() == View.GONE) {
-                imageButtonEmail.setVisibility(View.VISIBLE);
-            }
-        }
-*/
         ViewOutlineProvider provider = new ViewOutlineProvider() {
             @Override
             public void getOutline(View view, Outline outline) {
@@ -222,14 +152,10 @@ public class ObjectFragment extends Fragment implements  DrivingSession.DrivingR
             }
         };
 
-        try (InputStream inputStream = getContext().getAssets().open(object.getImgUrl())) {
-            Drawable drawable = Drawable.createFromStream(inputStream, null);
-            imageObject.setImageDrawable(drawable);
 
-            //imageObject.setOutlineProvider(provider);
-            //imageObject.setClipToOutline(true);
-        } catch (IOException e){e.printStackTrace();}
+        String imgUrl = "https://around.sourceforge.io/imagesproject/" + object.getId() +".png";
 
+       // Picasso.with(getContext()).load(imgUrl).centerCrop().fit().placeholder(R.drawable.progress_animation ).error(R.drawable.image_not_found).memoryPolicy(MemoryPolicy.NO_CACHE,MemoryPolicy.NO_STORE).networkPolicy(NetworkPolicy.NO_CACHE).into(imageObject);
 
         imgAccess.setOutlineProvider(provider);
         imgAccess.setClipToOutline(true);
@@ -256,14 +182,16 @@ public class ObjectFragment extends Fragment implements  DrivingSession.DrivingR
         DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
         int height = displayMetrics.heightPixels;
 
-        //устанавливаем высоту нижнего экрана
+        //устанавливаем максимальную высоту нижнего экрана
 
       //  BottomNavigationView bottom_navigation = (BottomNavigationView) getActivity().findViewById(R.id.bottom_navigation);
         int pixels_bottom_navigation = (int)ObjectTypeAdapter.convertDpToPixel(56,getContext());
         int maxHeight = height - lp.height - pixels_bottom_navigation + imageBaseline.getDrawable().getIntrinsicHeight();
         bottomSheetBehavior.setMaxHeight(maxHeight);
 
-        int pixels = (int)ObjectTypeAdapter.convertDpToPixel(250,getContext());
+        //установка высоты галлереи
+        int pixels = (int)ObjectTypeAdapter.convertDpToPixel(350,getContext());
+        //устанавливаем минимальную высоту нижнего экрана
         int minHeight = height -lp.height - pixels_bottom_navigation - pixels + imageBaseline.getDrawable().getIntrinsicHeight();
 
         bottomSheetBehavior.setPeekHeight(minHeight);
@@ -276,56 +204,22 @@ public class ObjectFragment extends Fragment implements  DrivingSession.DrivingR
         textNameAppBar.setAlpha(0);
 
 
-        //-----
+        //отображает превью карты
         ImageView imageMapObject = (ImageView) getView().findViewById(R.id.imageMapObject);
 
-      //  String sizeUrl = "size=" + String.valueOf(300) + "," + String.valueOf(imageMapObject.getLayoutParams().height);
         String sizeUrl = "size=" + String.valueOf(500) + "," + String.valueOf(300);
-
-        Log.d("sizeUrl", sizeUrl);
 
         String[] points = null;
         points = object.getLocation().split(",");
-        //Point pointObject = new Point(Double.valueOf(points[0]),Double.valueOf(points[1]));
-       // ROUTE_END_LOCATION = pointObject;
 
         String pointsUrl= "pt="+ points[1].trim() + "," + points[0].trim();
 
-        String imgUrl = "https://static-maps.yandex.ru/1.x/?l=map&"+pointsUrl+",pm2rdl&z=14&" + sizeUrl;
+        String imgUrlMap = "https://static-maps.yandex.ru/1.x/?l=map&"+pointsUrl+",pm2rdl&z=14&" + sizeUrl;
 
-        Log.d("imgUrl", imgUrl);
-        Picasso.with(getContext()).load(imgUrl).into(imageMapObject);
+        Picasso.with(getContext()).load(imgUrlMap).into(imageMapObject);
 
         imageMapObject.setOutlineProvider(provider);
         imageMapObject.setClipToOutline(true);
-
-
-        //-----
-
-        /*
-        //получение координат для отрисовки на карте из Object
-        String[] points = null;
-        points = object.getLocation().split(",");
-        Point pointObject = new Point(Double.valueOf(points[0]),Double.valueOf(points[1]));
-        ROUTE_END_LOCATION = pointObject;
-
-        MapView mapview = (MapView) getView().findViewById(R.id.mapview);
-
-        mapview.getMap().move(
-                new CameraPosition(pointObject, 16.0f, 0.0f, 0.0f),
-                new Animation(Animation.Type.SMOOTH, 0),
-                null);
-        //удаление всех меток с карты
-        mapview.getMap().getMapObjects().clear();
-        //установка и позиционирование метки объекта относительно низа середины картинки
-        IconStyle istyle= new IconStyle();
-        istyle.setAnchor(new PointF(0.5f,1.0f));
-        PlacemarkMapObject mark = mapview.getMap().getMapObjects().addPlacemark(pointObject, ImageProvider.fromResource(getContext(), R.drawable.lable));
-        mark.setIconStyle(istyle);
-        //установка логотипа яндекс в правый верхний угол
-        mapview.getMap().getLogo().setAlignment(new Alignment(HorizontalAlignment.LEFT,VerticalAlignment.TOP));
-
-        */
 
     }
 
@@ -333,13 +227,120 @@ public class ObjectFragment extends Fragment implements  DrivingSession.DrivingR
     @Override
     public void onViewStateRestored(Bundle savedInstanceState){
         super.onViewStateRestored(savedInstanceState);
-        Log.d("ListFragment onViewStateRestored","ListFragment onViewStateRestored");
-
+        // сообщаем MainActivity что ObjectFragment готов получить данные об объекте для отображения
+        // на данном этапе ObjectFragment полностью создан
         object = fragmentSendDataObjectListener.onGetDataObject();
         objectFragmentSetData();
-
+        sendRequestImageGallery();
     }
 
+    public void sendRequestImageGallery(){
+        //отправляет запрос серверу для получение списка фотографий объекта
+        apiInterface = APIRetrofitClient.getClient().create(APIRetrofitInterface.class);
+        Call<ImageObjectList> call = apiInterface.getImageObjectList(object.getId());
+
+        Log.d("CALL",call.request().headers().toString()+"");
+
+        Log.d("APIRetrofitClient13","APIRetrofitClient13");
+        call.enqueue(new Callback<ImageObjectList>() {
+            @Override
+            public void onResponse(Call<ImageObjectList> call, Response<ImageObjectList> response) {
+
+                Log.d("onResponse","onResponse");
+                Log.d("TAGCODE",response.code()+"");
+
+                Log.d("TAG",response.raw().protocol()+"");
+
+                //String displayResponse = "";
+                if (response.code() == 200) {
+                    ImageObjectList resource = response.body();
+
+                    List<ImageObjectList.ImagesList> imageList = resource.images;
+
+
+                    String[] imagesUrl = new String[imageList.size()];
+                    int i = 0;
+                    for (ImageObjectList.ImagesList image : imageList) {
+                        imagesUrl[i] = image.path;
+                        i++;
+                        Log.d("image", image.path);
+                        Log.d("id", String.valueOf(image.id));
+                    }
+                    Log.d("SIZE", String.valueOf(imagesUrl.length));
+                    setImagesOnSlider(imagesUrl);
+                }
+
+            }
+
+            @Override
+            public void onFailure(Call<ImageObjectList> call, Throwable t) {
+                Log.d("onFailure","onFailure");
+                call.cancel();
+
+                if (getView()!= null) {
+                    ImageView imageObject = (ImageView) getView().findViewById(R.id.imageObject);
+                    imageObject.setImageResource(R.drawable.image_not_found);
+                }
+            }
+        });
+    }
+
+    public void setImagesOnSlider(String[] imagesUrl) {
+        //устанавливает полученные фотографии для просмотра в ViewPager
+        Log.d("setImagesOnSlider","setImagesOnSlider");
+
+        if (getView()!= null) {
+
+            RelativeLayout relativeLayoutPager = (RelativeLayout) getView().findViewById(R.id.relativeLayoutPager);
+            ImageView imageObject = (ImageView) getView().findViewById(R.id.imageObject);
+
+            relativeLayoutPager.setVisibility(View.VISIBLE);
+            imageObject.setVisibility(View.GONE);
+
+            page = getView().findViewById(R.id.my_pager);
+            tabLayout = getView().findViewById(R.id.my_tablayout);
+
+
+            listItems = new ArrayList<>();
+            for (String url : imagesUrl) {
+                listItems.add(new SlideItemsModelClass(url));
+
+            }
+
+            if (listItems.size() < 2) tabLayout.setVisibility(View.INVISIBLE);
+            SlideItemsPagerAdapter itemsPager_adapter = new SlideItemsPagerAdapter(getContext(), listItems);
+            page.setAdapter(itemsPager_adapter);
+
+            // timer = new java.util.Timer();
+            // timer.scheduleAtFixedRate(new SlideTimer(),4000,8000);
+            tabLayout.setupWithViewPager(page, true);
+        }
+    }
+
+    public class SlideTimer extends TimerTask {
+        @Override
+        public void run() {
+
+            ObjectFragment.this.getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (page.getCurrentItem()< listItems.size()-1) {
+                        page.setCurrentItem(page.getCurrentItem()+1);
+                    }
+                    else
+                        page.setCurrentItem(0);
+                }
+            });
+        }
+    }
+
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (timer != null )timer.cancel();
+        getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER);
+    }
 
     // TODO: Rename and change types and number of parameters
     public static ObjectFragment newInstance(Object obj) {
@@ -354,17 +355,14 @@ public class ObjectFragment extends Fragment implements  DrivingSession.DrivingR
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+       // getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         if (getArguments() != null) {
+            //получаем данные об объекте
             object = (Object) getArguments().getSerializable(Object.class.getSimpleName());
         }
         settings = getContext().getSharedPreferences(PREFS_FILE, getContext().MODE_PRIVATE);
         favorites = settings.getStringSet(PREF_FAVORITES, new HashSet<String>());
-        Log.d("ObjectFragment onCreate","onCreate");
 
-        //mFusedLocationClient = LocationServices.getFusedLocationProviderClient(getActivity());
-
-        // method to get the location
-       // getLastLocation();
     }
     @Override
     public void onAttach(Context context) {
@@ -378,7 +376,6 @@ public class ObjectFragment extends Fragment implements  DrivingSession.DrivingR
 
     @Override
     public void onStop() {
-    //    MapView mapview = (MapView) getView().findViewById(R.id.mapview);
         super.onStop();
     }
 
@@ -390,8 +387,10 @@ public class ObjectFragment extends Fragment implements  DrivingSession.DrivingR
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        // Inflate the layout for this fragment
+        //
         View view = inflater.inflate(R.layout.fragment_object, container, false);
+
+        getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
         NestedScrollView nestedScroll = (NestedScrollView) view.findViewById(R.id.bottom_sheet_scroll);
         TextView textName = (TextView) view.findViewById(R.id.textName);
@@ -409,12 +408,6 @@ public class ObjectFragment extends Fragment implements  DrivingSession.DrivingR
                 }
             }
         });
-
-        FloatingActionButton fabUserLocation = (FloatingActionButton) view.findViewById(R.id.fabUserLocation);
-
-        LinearLayout llBottomSheet = (LinearLayout) view.findViewById(R.id.bottom_sheet);
-        BottomSheetBehavior bottomSheetBehavior = BottomSheetBehavior.from(llBottomSheet);
-        //получаем высоту экрана
 
         Button buttonBackToList = (Button) view.findViewById(R.id.buttonBackToList);
         buttonBackToList.setOnClickListener(new View.OnClickListener(){
@@ -473,28 +466,6 @@ public class ObjectFragment extends Fragment implements  DrivingSession.DrivingR
                 getActivity().startActivity(openPage);
             }
         });
-       /* ImageButton imageButtonRoute = (ImageButton) view.findViewById(R.id.imageButtonRoute);
-
-        imageButtonRoute.setOnClickListener(new View.OnClickListener()
-        {
-            @Override
-            public void onClick(View v)
-            {
-
-                bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
-                setDriving();
-
-
-                String email = object.getEmail();
-                Intent emailIntent= new Intent(Intent.ACTION_SEND);
-                emailIntent.setType("plain/text");
-                // Кому
-                emailIntent.putExtra(android.content.Intent.EXTRA_EMAIL, new String[] { email });
-                getActivity().startActivity(emailIntent);
-            }
-        });
-
-        */
 
         ImageButton imageButtonShare = (ImageButton) view.findViewById(R.id.imageButtonShare);
 
@@ -537,103 +508,17 @@ public class ObjectFragment extends Fragment implements  DrivingSession.DrivingR
             }
         });
 
-        /*
-        ImageView imageObject = (ImageView) view.findViewById(R.id.imageObject);
-        imageObject.setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View v){
-                setFavorite();
-                fragmentSendDataObjectListener.onUpdateListObjects();
-                return true;
-            }
-        });
-
-         */
         ImageView imageMapObject = (ImageView) view.findViewById(R.id.imageMapObject);
         imageMapObject.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Log.d("MAP Activity","MAP Activity");
-
                 Intent intent = new Intent(getActivity(), MapObjectActivity.class);
-              //  intent.putExtra("name", name);
-              //  intent.putExtra("company", company);
-              //  intent.putExtra("age", age);
                 intent.putExtra(Object.class.getSimpleName(), object);
                 startActivity(intent);
             }
         });
 
         return view;
-    }
-
-
-    public void setDriving() {
-
-        if (ROUTE_START_LOCATION != null) {
-            MapView mapview = (MapView) getView().findViewById(R.id.mapview);
-
-            if (mapObjects != null) {
-                mapview.getMap().getMapObjects().remove(mapObjects);
-            }
-
-            //ROUTE_START_LOCATION = userLocationLayer.cameraPosition().getTarget();
-            drivingRouter = DirectionsFactory.getInstance().createDrivingRouter();
-            mapObjects = mapview.getMap().getMapObjects().addCollection();
-            submitRequest();
-        }
-    }
-
-    @Override
-    public void onDrivingRoutes(List<DrivingRoute> routes) {
-       /* for (DrivingRoute route : routes) {
-            mapObjects.addPolyline(route.getGeometry());
-        }
-        */
-        if (routes != null && !routes.isEmpty()) {
-            mapObjects.addPolyline(routes.get(0).getGeometry());
-
-            MapView mapview = (MapView) getView().findViewById(R.id.mapview);
-            BoundingBox box = BoundingBoxHelper.getBounds(routes.get(0).getGeometry());
-            CameraPosition boundingBoxPosition = mapview.getMap().cameraPosition(box);
-            mapview.getMap().move(new CameraPosition(boundingBoxPosition.getTarget(), boundingBoxPosition.getZoom() - 0.8F, 0, 0));
-
-
-            /*BoundingBox boundingBox= new BoundingBox(ROUTE_START_LOCATION,ROUTE_END_LOCATION);
-            CameraPosition boundingBoxPosition = mapview.getMap().cameraPosition(boundingBox);
-
-            mapview.getMap().move(new CameraPosition(boundingBoxPosition.getTarget(), boundingBoxPosition.getZoom() - 0.8F, 0, 0));
-*/
-        }
-    }
-    @Override
-    public void onDrivingRoutesError(Error error) {
-        Log.d("Error onDrivingRoutesError","Error onDrivingRoutesError");
-    /*    String errorMessage = getString(R.string.unknown_error_message);
-        if (error instanceof RemoteError) {
-            errorMessage = getString(R.string.remote_error_message);
-        } else if (error instanceof NetworkError) {
-            errorMessage = getString(R.string.network_error_message);
-        }
-
-        Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
-
-      */
-    }
-
-    private void submitRequest() {
-        DrivingOptions drivingOptions = new DrivingOptions();
-        VehicleOptions vehicleOptions = new VehicleOptions();
-        ArrayList<RequestPoint> requestPoints = new ArrayList<>();
-        requestPoints.add(new RequestPoint(
-                ROUTE_START_LOCATION,
-                RequestPointType.WAYPOINT,
-                null));
-        requestPoints.add(new RequestPoint(
-                ROUTE_END_LOCATION,
-                RequestPointType.WAYPOINT,
-                null));
-        drivingSession = drivingRouter.requestRoutes(requestPoints, drivingOptions, vehicleOptions, this);
     }
 
     public void setFavorite() {

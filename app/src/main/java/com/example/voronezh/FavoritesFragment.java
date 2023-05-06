@@ -2,13 +2,13 @@ package com.example.voronezh;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
-import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.ItemTouchHelper;
@@ -18,18 +18,19 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.FrameLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.snackbar.Snackbar;
 
-import java.io.IOException;
-import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class FavoritesFragment extends Fragment {
 
@@ -37,11 +38,11 @@ public class FavoritesFragment extends Fragment {
     private static final String PREF_FAVORITES = "Favorites";
     Set<String> favorites;
     SharedPreferences settings;
+    APIRetrofitInterface apiInterface;
     List<Object> objects;
     interface OnFragmentSendDataFavoriteListener {
-        //void onSendDataListBack();
+        //сообщаем MainActivity о нажатии на объект в избранном
         void onSendDataFavoriteObject(Object data,int position);
-        //TypeObject onGetDataTypeObject();
     }
 
     private FavoritesFragment.OnFragmentSendDataFavoriteListener fragmentSendDataFavoriteListener;
@@ -50,15 +51,8 @@ public class FavoritesFragment extends Fragment {
         // Required empty public constructor
     }
 
-    public static FavoritesFragment newInstance(String param1, String param2) {
-        FavoritesFragment fragment = new FavoritesFragment();
-        Bundle args = new Bundle();
-        //fragment.setArguments(args);
-        return fragment;
-    }
-
     @Override
-    public void onAttach(Context context) {
+    public void onAttach(@NonNull Context context) {
         super.onAttach(context);
         try {
             fragmentSendDataFavoriteListener = (FavoritesFragment.OnFragmentSendDataFavoriteListener) context;
@@ -71,15 +65,15 @@ public class FavoritesFragment extends Fragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         settings = getContext().getSharedPreferences(PREFS_FILE, getContext().MODE_PRIVATE);
-        favorites = settings.getStringSet(PREF_FAVORITES, new HashSet<String>());
+        //получаем список избранных из SharedPreferences
+        favorites = settings.getStringSet(PREF_FAVORITES, new HashSet<>());
     }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        // Inflate the layout for this fragment
-        //return inflater.inflate(R.layout.fragment_favorites, container, false);
         View view = inflater.inflate(R.layout.fragment_favorites, container, false);
+        getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER);
         RecyclerView objectsList = (RecyclerView) view.findViewById(R.id.objectsList);
 
         int spanCount = 1;
@@ -93,7 +87,6 @@ public class FavoritesFragment extends Fragment {
         ObjectAdapter.OnObjectClickListener objectClickListener = new ObjectAdapter.OnObjectClickListener() {
             @Override
             public void onObjectClick(Object object, int position) {
-                Log.d("onObjectClick", object.getName());
                 fragmentSendDataFavoriteListener.onSendDataFavoriteObject(object,position);
             }
 
@@ -107,22 +100,7 @@ public class FavoritesFragment extends Fragment {
         adapter.open();
 
         objects = adapter.getObjectsFavorite();
-
-        for(Object object : objects){
-
-            String filename = String.valueOf(object.getId()) + ".png";
-            try(InputStream inputStream = getContext().getAssets().open(filename)){
-                object.setImgUrl(filename);
-            }
-            catch (IOException e){
-                filename = String.valueOf(object.getId()) + ".jpg";
-                try(InputStream inputStream = getContext().getAssets().open(filename)){
-                    object.setImgUrl(filename);
-                } catch (IOException e_jpg) {e_jpg.printStackTrace();}
-                // e.printStackTrace();
-            }
-        }
-
+        sendRequestPreviewObjects(objects);
 
         ObjectAdapter objectAdapter = new ObjectAdapter(getContext(), objects,objectClickListener,true);
 
@@ -132,19 +110,21 @@ public class FavoritesFragment extends Fragment {
         ItemTouchHelper swipeToDismissTouchHelper = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(
                 ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT, ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
             @Override
-            public boolean onMove(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder, RecyclerView.ViewHolder target) {
+            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
                 // callback for drag-n-drop, false to skip this feature
                 return false;
             }
 
             @Override
-            public void onSwiped(RecyclerView.ViewHolder viewHolder, int direction) {
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                // удаляем объект из избранного если пользовалель смахнул его
                 removeObjectFavorites(objectAdapter.getItem(viewHolder.getBindingAdapterPosition()),viewHolder.getBindingAdapterPosition());
                 setEmptyView(view);
             }
 
             @Override
             public void onChildDraw(@NonNull Canvas c, @NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, float dX, float dY, int actionState, boolean isCurrentlyActive) {
+                // делаем прозрачным при смахивании элемента в RecyclerView
                 super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive);
 
                 if (actionState == ItemTouchHelper.ACTION_STATE_SWIPE) {
@@ -167,12 +147,68 @@ public class FavoritesFragment extends Fragment {
         return view;
     }
 
+    public void sendRequestPreviewObjects(List<Object> objects){
+        //отправляет запрос серверу для получение списка preview объектов
+        apiInterface = APIRetrofitClient.getClient().create(APIRetrofitInterface.class);
+
+        ArrayList<String> arr_id = new ArrayList<>();
+        for (Object object : objects) {
+
+            arr_id.add(String.valueOf(object.getId()));
+        }
+
+        Call<PreviewObjects> call = apiInterface.getPreviewObjects(arr_id);
+
+        Log.d("CALL",call.request().headers().toString()+"");
+
+        call.enqueue(new Callback<PreviewObjects>() {
+            @Override
+            public void onResponse(@NonNull Call<PreviewObjects> call, @NonNull Response<PreviewObjects> response) {
+
+                Log.d("TAGCODE",response.code()+"");
+                Log.d("TAG",response.raw().protocol()+"");
+
+                if (response.code() == 200) {
+                    PreviewObjects resource = response.body();
+
+                    List<PreviewObjects.PreviewList> previewList = resource.objects;
+
+                    setPreviewObjects(previewList);
+                }
+
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<PreviewObjects> call, @NonNull Throwable t) {
+                Log.d("onFailure","onFailure");
+                call.cancel();
+
+            }
+        });
+    }
+
+    public void setPreviewObjects(List<PreviewObjects.PreviewList> previewList) {
+        //устанавливает preview объектам
+        if (getView() != null) {
+            RecyclerView objectsList = (RecyclerView) getView().findViewById(R.id.objectsList);
+            ObjectAdapter objectAdapter = (ObjectAdapter) objectsList.getAdapter();
+
+            for (PreviewObjects.PreviewList preview : previewList) {
+                for (int i = 0; i < objectAdapter.getItemCount(); ++i) {
+                    Object object = (Object) objectAdapter.getItem(i);
+                    if (preview.id == object.getId()) {
+                        object.setImgUrl(preview.path);
+                        objectAdapter.notifyItemChanged(i);
+                        break;
+                    }
+
+                }
+            }
+        }
+    }
+
     public void removeObjectFavorites(Object selectedObject,int position) {
-        Log.d("setObjectFavorites","setObjectFavorites");
         //удаление объекта из избранного
-        Log.d("selectedObject :: ", selectedObject.getName());
- //       settings = getContext().getSharedPreferences(PREFS_FILE, getContext().MODE_PRIVATE);
- //       favorites = settings.getStringSet(PREF_FAVORITES, new HashSet<String>());
 
         favorites.remove(String.valueOf(selectedObject.getId()));
         SharedPreferences.Editor prefEditor = settings.edit();
@@ -183,10 +219,11 @@ public class FavoritesFragment extends Fragment {
         objects.remove(position);
         objectAdapter.notifyItemRemoved(position);
         prefEditor.remove(PREF_FAVORITES);
-        prefEditor.commit();
+        prefEditor.apply();
         prefEditor.putStringSet(PREF_FAVORITES, favorites);
-        prefEditor.commit();
+        prefEditor.apply();
 
+        // используем Snackbar для отмены удаления объекта из избранного
         Snackbar snackbar = Snackbar.make(getView(), "Объект был удален из избранного.", Snackbar.LENGTH_LONG);
         BottomNavigationView bottom_navigation = (BottomNavigationView) getActivity().findViewById(R.id.bottom_navigation);
         snackbar.setAnchorView(bottom_navigation);
@@ -197,9 +234,9 @@ public class FavoritesFragment extends Fragment {
                 SharedPreferences.Editor prefEditor = settings.edit();
                 favorites.add(String.valueOf(selectedObject.getId()));
                 prefEditor.remove(PREF_FAVORITES);
-                prefEditor.commit();
+                prefEditor.apply();
                 prefEditor.putStringSet(PREF_FAVORITES, favorites);
-                prefEditor.commit();
+                prefEditor.apply();
 
                 objectAdapter.restoreItem(selectedObject, position);
                 objectsList.scrollToPosition(position);
@@ -212,6 +249,7 @@ public class FavoritesFragment extends Fragment {
     }
 
     public void removeObjectFavorite(int position) {
+        //удаляет объект из RecyclerView избранного
         RecyclerView objectsList = (RecyclerView) getView().findViewById(R.id.objectsList);
         ObjectAdapter objectAdapter = (ObjectAdapter)objectsList.getAdapter();
         objects.remove(position);
@@ -220,6 +258,7 @@ public class FavoritesFragment extends Fragment {
     }
 
     public void addObjectFavorite(Object selectedObject, int position) {
+        //добавляет объект в RecyclerView избранного
         RecyclerView objectsList = (RecyclerView) getView().findViewById(R.id.objectsList);
         ObjectAdapter objectAdapter = (ObjectAdapter)objectsList.getAdapter();
         objectAdapter.restoreItem(selectedObject, position);
@@ -228,15 +267,14 @@ public class FavoritesFragment extends Fragment {
     }
 
     public void setEmptyView(View view) {
+        //устанавливает надпись если список избанного пуст
         RecyclerView objectsList = (RecyclerView) view.findViewById(R.id.objectsList);
         TextView emptyView = (TextView) view.findViewById(R.id.emptyView);
         if (objects.isEmpty()) {
-            Log.d("emptyView","emptyView");
             objectsList.setVisibility(View.GONE);
             emptyView.setVisibility(View.VISIBLE);
         }
         else {
-            Log.d("not emptyView","not emptyView");
             objectsList.setVisibility(View.VISIBLE);
             emptyView.setVisibility(View.GONE);
         }

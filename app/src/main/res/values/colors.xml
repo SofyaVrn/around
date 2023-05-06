@@ -11,4 +11,5 @@
     <color name="text_type">#696969</color>
     <color name="fab_not_selected">#FFE0E0E0</color>
     <color name="fab_selected">#FF03DAC5</color>
+    <color name="load_map">#FFF8DC</color>
 </resources>

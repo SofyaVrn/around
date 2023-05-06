@@ -5,40 +5,35 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Outline;
 import android.graphics.PorterDuff;
-import android.graphics.drawable.Drawable;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.ViewOutlineProvider;
-import android.widget.ArrayAdapter;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.squareup.picasso.MemoryPolicy;
+import com.squareup.picasso.NetworkPolicy;
 import com.squareup.picasso.Picasso;
 
 import org.xmlpull.v1.XmlPullParser;
 
 
 public class ObjectAdapter extends  RecyclerView.Adapter<ObjectAdapter.ViewHolder>{
-    private LayoutInflater inflater;
- //   private int layout;
-    private List<Object> objects;
-    private boolean isVisibilityType;
+    private final LayoutInflater inflater;
+    private final List<Object> objects;
+    private final boolean isVisibilityType;
     private ArrayList<TypeObject> objectsType;
-
     Context context;
-
     private static final String PREFS_FILE = "Account";
     private static final String PREF_FAVORITES = "Favorites";
     Set<String> favorites;
@@ -67,9 +62,9 @@ public class ObjectAdapter extends  RecyclerView.Adapter<ObjectAdapter.ViewHolde
 
     }
 
-
+    @NonNull
     @Override
-    public ObjectAdapter.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+    public ObjectAdapter.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
 
         View view = inflater.inflate(R.layout.item_list, parent, false);
         return new ObjectAdapter.ViewHolder(view);
@@ -90,24 +85,20 @@ public class ObjectAdapter extends  RecyclerView.Adapter<ObjectAdapter.ViewHolde
             }
         };
 
-        try (InputStream inputStream = context.getAssets().open(object.getImgUrl())) {
-            Drawable drawable = Drawable.createFromStream(inputStream, null);
-            holder.imgView.setImageDrawable(drawable);
+        //String imgUrl = "https://around.sourceforge.io/imagesproject/" + object.getId() +".png";
 
-            holder.imgView.setOutlineProvider(provider);
-            holder.imgView.setClipToOutline(true);
+        //Picasso.with(context).load(imgUrl).centerCrop().fit().placeholder(R.drawable.progress_animation ).error(R.drawable.image_not_found).memoryPolicy(MemoryPolicy.NO_CACHE,MemoryPolicy.NO_STORE).networkPolicy(NetworkPolicy.NO_CACHE).into(holder.imgView);
 
-        } catch (IOException e){e.printStackTrace();}
-
-       // String imgUrl = "https://static-maps.yandex.ru/1.x/?l=map&"+pointsUrl+",pm2rdl&z=14&" + sizeUrl;
-       /* String imgUrl = "https://placesvrn.sourceforge.io/images/" + object.getId() +".png";
-
-        Log.d("imgUrl :: ", imgUrl);
-        Picasso.with(context).load(imgUrl).centerCrop().fit().into(holder.imgView);
-*/
+        if (MainApplication.IMAGE_CACHING) {
+            Picasso.with(context).load(object.getImgUrl()).centerCrop().fit().placeholder(R.drawable.progress_animation).error(R.drawable.image_not_found).into(holder.imgView);
+        } else {
+            Picasso.with(context).load(object.getImgUrl()).centerCrop().fit().placeholder(R.drawable.progress_animation).error(R.drawable.image_not_found).memoryPolicy(MemoryPolicy.NO_CACHE, MemoryPolicy.NO_STORE).networkPolicy(NetworkPolicy.NO_CACHE).into(holder.imgView);
+        }
+        holder.imgView.setOutlineProvider(provider);
+        holder.imgView.setClipToOutline(true);
 
         settings = context.getSharedPreferences(PREFS_FILE, context.MODE_PRIVATE);
-        favorites = settings.getStringSet(PREF_FAVORITES, new HashSet<String>());
+        favorites = settings.getStringSet(PREF_FAVORITES, new HashSet<>());
         boolean isContains = favorites.contains(String.valueOf(object.getId()));
 
         if (isContains){

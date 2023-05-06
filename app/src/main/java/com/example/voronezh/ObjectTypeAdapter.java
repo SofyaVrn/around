@@ -2,27 +2,27 @@ package com.example.voronezh;
 
 import android.content.Context;
 import android.graphics.Outline;
-import android.graphics.drawable.Drawable;
 import android.util.DisplayMetrics;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.ViewOutlineProvider;
-import android.widget.ArrayAdapter;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import java.io.IOException;
-import java.io.InputStream;
+import com.squareup.picasso.MemoryPolicy;
+import com.squareup.picasso.NetworkPolicy;
+import com.squareup.picasso.Picasso;
+
 import java.util.List;
 
 public class ObjectTypeAdapter extends RecyclerView.Adapter<ObjectTypeAdapter.ViewHolder> {
 
-    private LayoutInflater inflater;
-    private List<TypeObject> objects;
+    private final LayoutInflater inflater;
+    private final List<TypeObject> objects;
     Context context;
 
     interface OnTypeObjectClickListener{
@@ -37,21 +37,24 @@ public class ObjectTypeAdapter extends RecyclerView.Adapter<ObjectTypeAdapter.Vi
         this.onClickTypeObjectListener = onClickTypeObjectListener;
     }
 
+    @NonNull
     @Override
-    public ObjectTypeAdapter.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+    public ObjectTypeAdapter.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
 
         View view = inflater.inflate(R.layout.cell_grid, parent, false);
         return new ViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(ObjectTypeAdapter.ViewHolder holder, int position) {
+    public void onBindViewHolder(@NonNull ObjectTypeAdapter.ViewHolder holder, int position) {
         TypeObject object = objects.get(position);
 
-        try (InputStream inputStream = context.getAssets().open(object.getImgResource())) {
-            Drawable drawable = Drawable.createFromStream(inputStream, null);
-            holder.imageView.setImageDrawable(drawable);
-        } catch (IOException e){e.printStackTrace();}
+        String imgUrl = "https://around.sourceforge.io/imagesproject/" + object.getImgResource();
+        if (MainApplication.IMAGE_CACHING) {
+            Picasso.with(context).load(imgUrl).centerCrop().fit().placeholder(R.drawable.progress_animation ).error(R.drawable.image_not_found).into(holder.imageView);
+        } else {
+            Picasso.with(context).load(imgUrl).centerCrop().fit().placeholder(R.drawable.progress_animation).error(R.drawable.image_not_found).memoryPolicy(MemoryPolicy.NO_CACHE, MemoryPolicy.NO_STORE).networkPolicy(NetworkPolicy.NO_CACHE).into(holder.imageView);
+        }
 
         // Устанавливаем округлые углы у картинки
         ViewOutlineProvider provider = new ViewOutlineProvider() {
@@ -64,7 +67,6 @@ public class ObjectTypeAdapter extends RecyclerView.Adapter<ObjectTypeAdapter.Vi
         holder.imageView.setOutlineProvider(provider);
         holder.imageView.setClipToOutline(true);
 
-      //  float heightPixel = (float)object.getHeight();
         holder.imageView.getLayoutParams().height = (int)convertDpToPixel(object.getHeight(),this.context);
         holder.nameView.setText(object.getName());
 

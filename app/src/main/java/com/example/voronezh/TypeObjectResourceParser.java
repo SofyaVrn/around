@@ -5,7 +5,7 @@ import java.util.ArrayList;
 
 public class TypeObjectResourceParser {
 
-    private ArrayList<TypeObject> typeObjects;
+    private final ArrayList<TypeObject> typeObjects;
 
     public TypeObjectResourceParser(){
         typeObjects = new ArrayList<>();
@@ -47,6 +47,8 @@ public class TypeObjectResourceParser {
                                 currentTypeObject.setIdType(Integer.valueOf(textValue));
                             } else if("imgResource".equalsIgnoreCase(tagName)){
                                 currentTypeObject.setImgResource(textValue);
+                            } else if("icon".equalsIgnoreCase(tagName)){
+                                currentTypeObject.setIcon(textValue);
                             } else if("heightImg".equalsIgnoreCase(tagName)){
                                 currentTypeObject.setHeight(Integer.valueOf(textValue));
                             }

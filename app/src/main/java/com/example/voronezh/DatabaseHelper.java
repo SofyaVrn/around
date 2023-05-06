@@ -14,7 +14,7 @@ import java.io.OutputStream;
 
 class DatabaseHelper extends SQLiteOpenHelper {
     private static String DB_PATH; // полный путь к базе данных
-    private static String DB_NAME = "data.db3";
+    private static final String DB_NAME = "data.db3";
     private static final int SCHEMA = 1; // версия базы данных
     static final String TABLE = "objects"; // название таблицы в бд
     // названия столбцов
@@ -31,7 +31,7 @@ class DatabaseHelper extends SQLiteOpenHelper {
     static final String COLUMN_WEBSITE = "website";
 
 
-    private Context myContext;
+    private final Context myContext;
 
     DatabaseHelper(Context context) {
         super(context, DB_NAME, null, SCHEMA);

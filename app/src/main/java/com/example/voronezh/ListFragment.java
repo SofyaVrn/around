@@ -2,14 +2,11 @@ package com.example.voronezh;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
-import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 
-//import android.app.Fragment;
-import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
+import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 
 import android.text.Editable;
@@ -19,59 +16,44 @@ import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowManager;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.EditText;
-import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ListView;
 import android.widget.TextView;
 
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.widget.Toast;
 
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
-import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import androidx.recyclerview.widget.StaggeredGridLayoutManager;
 
-import com.google.android.material.snackbar.Snackbar;
-
-import java.io.IOException;
-import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
 
 public class ListFragment extends Fragment {
 
-    DatabaseHelper databaseHelper;
-    SQLiteDatabase db;
-    Cursor userCursor;
     TypeObject typeObject;
-   // TextView text;
-  //  ListView objectsList;
-   // EditText userFilter;
-  //  SwitchCompat switchAccessibility;
-  ///  Button buttonBack;
-    ArrayAdapter<Object> arrayAdapter;
     String filterText ="";
     boolean isAccessebility;
     Set<String> favorites;
 
     LinearLayout filterContainer;
     int containerHeight;
+    APIRetrofitInterface apiInterface;
+
 
     private static final String PREFS_FILE = "Account";
     private static final String PREF_ACCESS = "Accessibility";
@@ -80,58 +62,36 @@ public class ListFragment extends Fragment {
     SharedPreferences settings;
 
     interface OnFragmentSendDataListListener {
+        // сообщает MainActivity что пользователь кликнул на кнопку назад
         void onSendDataListBack();
+        // сообщает MainActivity что пользователь кликнул по объекту
         void onSendDataListObject(Object data,int position);
+        //получает для ListFragment  данные по объекты из MainActivity
         TypeObject onGetDataTypeObject();
     }
 
     private ListFragment.OnFragmentSendDataListListener fragmentSendDataListListener;
-
-
-    // TODO: Rename parameter arguments, choose names that match
-    // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-    private static final String ARG_PARAM1 = "param1";
-    private static final String ARG_PARAM2 = "param2";
-
-    // TODO: Rename and change types of parameters
-    private String mParam1;
-    private String mParam2;
 
     public ListFragment() {
         // Required empty public constructor
     }
 
     public void listFragmentSetDataFilter(String filter, boolean isAccess) {
-        Log.d("listFragmentSetDataFilter","listFragmentSetDataFilter");
-        Log.d("filter",filter);
+        //заполняет RecyclerView данными об объектах выбранных по фильтру filter
         DatabaseAdapter adapter = new DatabaseAdapter(getContext());
         adapter.open();
 
-        if (typeObject == null) {
-            Log.d("filter","typeObject is null");
-        }
+        //получаем из базы список объектов
         List<Object> objects = adapter.getObjectsFilter(typeObject.getIdType(),filter,isAccess);
 
-        for(Object object : objects){
-
-            String filename = String.valueOf(object.getId()) + ".png";
-            try(InputStream inputStream = getContext().getAssets().open(filename)){
-                object.setImgUrl(filename);
-            }
-            catch (IOException e){
-                filename = String.valueOf(object.getId()) + ".jpg";
-                try(InputStream inputStream = getContext().getAssets().open(filename)){
-                    object.setImgUrl(filename);
-                } catch (IOException e_jpg) {e_jpg.printStackTrace();}
-                // e.printStackTrace();
-            }
-        }
+        sendRequestPreviewObjects(objects);
 
         TextView text = (TextView) getView().findViewById(R.id.textFragment);
         text.setText(typeObject.getName().toUpperCase());
 
         RecyclerView objectsList = (RecyclerView) getView().findViewById(R.id.objectsList);
 
+        //зависимо от ориентации устройства выставляем сколько колонок отображать в RecyclerView
         int spanCount = 1;
         if(getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
             spanCount = 2;
@@ -139,17 +99,17 @@ public class ListFragment extends Fragment {
         GridLayoutManager gridLayoutManager = new GridLayoutManager(getContext(), spanCount);
 
         objectsList.setLayoutManager(gridLayoutManager);
-       // int pixels = (int)ObjectTypeAdapter.convertDpToPixel(4,getContext());
-       // objectsList.addItemDecoration(new EqualSpacingItemDecoration(pixels));
 
         ObjectAdapter.OnObjectClickListener objectClickListener = new ObjectAdapter.OnObjectClickListener() {
             @Override
             public void onObjectClick(Object object, int position) {
+                //пользователь кликнул по объекту, сообщаем это MainActivity
                 fragmentSendDataListListener.onSendDataListObject(object,position);
             }
 
             @Override
             public void onObjectFavoriteClick(Object object, int position) {
+                //пользователь кликнул по иконке избранного в объекте
                 setObjectFavorites(object,position);
             }
         };
@@ -163,7 +123,7 @@ public class ListFragment extends Fragment {
         adapter.close();
     }
     public void listFragmentSetData() {
-        Log.d("listFragmentSetData","listFragmentSetData");
+        //заполняет RecyclerView данными об объектах без фильтра
 
         EditText userFilter = (EditText)getView().findViewById(R.id.objectFilter);
         userFilter.getText().clear();
@@ -173,31 +133,17 @@ public class ListFragment extends Fragment {
 
         TextView text = (TextView) getView().findViewById(R.id.textFragment);
         text.setText(typeObject.getName().toUpperCase());
-        Log.d("TAG_LIST", typeObject.getName());
 
         DatabaseAdapter adapter = new DatabaseAdapter(getContext());
         adapter.open();
 
+        //получаем из базы список объектов
         List<Object> objects = adapter.getObjects(typeObject.getIdType(),isAccessebility);
 
-        for(Object object : objects){
-
-            String filename = String.valueOf(object.getId()) + ".png";
-            try(InputStream inputStream = getContext().getAssets().open(filename)){
-                object.setImgUrl(filename);
-            }
-            catch (IOException e){
-                filename = String.valueOf(object.getId()) + ".jpg";
-                try(InputStream inputStream = getContext().getAssets().open(filename)){
-                    object.setImgUrl(filename);
-                } catch (IOException e_jpg) {e_jpg.printStackTrace();}
-               // e.printStackTrace();
-            }
-        }
-
+        sendRequestPreviewObjects(objects);
         RecyclerView objectsList = (RecyclerView) getView().findViewById(R.id.objectsList);
 
-
+        //зависимо от ориентации устройства выставляем сколько колонок отображать в RecyclerView
         int spanCount = 1;
         if(getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
             spanCount = 2;
@@ -206,22 +152,17 @@ public class ListFragment extends Fragment {
 
         objectsList.setLayoutManager(gridLayoutManager);
 
-       // int pixels = (int)ObjectTypeAdapter.convertDpToPixel(4,getContext());
-      //  objectsList.addItemDecoration(new EqualSpacingItemDecoration(pixels));
-        //objectsList.setHasFixedSize(true);
-
 
         ObjectAdapter.OnObjectClickListener objectClickListener = new ObjectAdapter.OnObjectClickListener() {
             @Override
             public void onObjectClick(Object object, int position) {
-                Log.d("onObjectClick", object.getName());
+                //пользователь кликнул по объекту, сообщаем это MainActivity
                 fragmentSendDataListListener.onSendDataListObject(object,position);
             }
 
             @Override
             public void onObjectFavoriteClick(Object object, int position) {
-                //Log.d("onObjectClick", object.getName());
-                //fragmentSendDataListListener.onSendDataListObject(object,position);
+                //пользователь кликнул по иконке избранного в объекте
                 setObjectFavorites(object,position);
             }
         };
@@ -234,8 +175,68 @@ public class ListFragment extends Fragment {
         adapter.close();
     }
 
+    public void sendRequestPreviewObjects(List<Object> objects){
+        //отправляет запрос серверу для получение списка preview объектов
+        apiInterface = APIRetrofitClient.getClient().create(APIRetrofitInterface.class);
+
+        ArrayList<String> arr_id = new ArrayList<>();
+        for (Object object : objects) {
+
+            arr_id.add(String.valueOf(object.getId()));
+        }
+
+        Call<PreviewObjects> call = apiInterface.getPreviewObjects(arr_id);
+
+        Log.d("CALL",call.request().headers().toString()+"");
+
+        call.enqueue(new Callback<PreviewObjects>() {
+            @Override
+            public void onResponse(Call<PreviewObjects> call, Response<PreviewObjects> response) {
+
+                Log.d("TAGCODE",response.code()+"");
+                Log.d("TAG",response.raw().protocol()+"");
+
+                if (response.code() == 200) {
+                    PreviewObjects resource = response.body();
+
+                    List<PreviewObjects.PreviewList> previewList = resource.objects;
+
+                    setPreviewObjects(previewList);
+                }
+
+            }
+
+            @Override
+            public void onFailure(Call<PreviewObjects> call, Throwable t) {
+                Log.d("onFailure","onFailure");
+                call.cancel();
+
+            }
+        });
+    }
+
+    public void setPreviewObjects(List<PreviewObjects.PreviewList> previewList) {
+        //устанавливает preview объектам
+        if (getView() != null) {
+            RecyclerView objectsList = (RecyclerView) getView().findViewById(R.id.objectsList);
+            ObjectAdapter objectAdapter = (ObjectAdapter) objectsList.getAdapter();
+
+            for (PreviewObjects.PreviewList preview : previewList) {
+
+                for (int i = 0; i < objectAdapter.getItemCount(); ++i) {
+                    Object object = (Object) objectAdapter.getItem(i);
+                    if (preview.id == object.getId()) {
+                        object.setImgUrl(preview.path);
+                        objectAdapter.notifyItemChanged(i);
+                        break;
+                    }
+
+                }
+            }
+        }
+    }
+
     public void setObjectFavorites(Object selectedObject,int position) {
-        Log.d("setObjectFavorites","setObjectFavorites");
         //добавление либо удаление объекта из избранного
         favorites = settings.getStringSet(PREF_FAVORITES, new HashSet<String>());
 
@@ -252,7 +253,6 @@ public class ListFragment extends Fragment {
 
         RecyclerView objectsList = (RecyclerView) getView().findViewById(R.id.objectsList);
         ObjectAdapter objectAdapter = (ObjectAdapter)objectsList.getAdapter();
-        //objectAdapter.notifyDataSetChanged();
         objectAdapter.notifyItemChanged(position);
         prefEditor.remove(PREF_FAVORITES);
         prefEditor.commit();
@@ -260,8 +260,9 @@ public class ListFragment extends Fragment {
         prefEditor.commit();
 
     }
-   // updateListObjects
+
    public void updateListObjects(int position) {
+        // обновляет RecyclerView по позиции в списке
        RecyclerView objectsList = (RecyclerView) getView().findViewById(R.id.objectsList);
        ObjectAdapter objectAdapter = (ObjectAdapter)objectsList.getAdapter();
        objectAdapter.notifyItemChanged(position);
@@ -278,7 +279,7 @@ public class ListFragment extends Fragment {
 
 
     @Override
-    public void onAttach(Context context) {
+    public void onAttach(@NonNull Context context) {
         super.onAttach(context);
         try {
             fragmentSendDataListListener = (ListFragment.OnFragmentSendDataListListener) context;
@@ -288,17 +289,17 @@ public class ListFragment extends Fragment {
     }
 
     @Override
-    public void onSaveInstanceState(Bundle outState) {
+    public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
+        //сохраняем данные перед уничтожением Activity
         outState.putSerializable(TypeObject.class.getSimpleName(), typeObject);
         outState.putString("filter", filterText);
-//        Log.d("LOG_TAG", "onSaveInstanceState");
     }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        Log.d("ListFragment onCreate","ListFragment onCreate");
         if (savedInstanceState != null) {
+            //получаем сохраненные данные из ранее созданной Activity
             typeObject = (TypeObject) savedInstanceState.getSerializable(TypeObject.class.getSimpleName());
             filterText = savedInstanceState.getString("filter");
         }
@@ -313,8 +314,8 @@ public class ListFragment extends Fragment {
     @Override
     public void onViewStateRestored(Bundle savedInstanceState){
         super.onViewStateRestored(savedInstanceState);
-        Log.d("ListFragment onViewStateRestored","ListFragment onViewStateRestored");
-
+        // сообщаем MainActivity что ListFragment готов получить данные об объектах для отображения
+        // на данном этапе ListFragment полностью создан
         typeObject = fragmentSendDataListListener.onGetDataTypeObject();
 
         if (filterText.isEmpty()) {
@@ -323,24 +324,15 @@ public class ListFragment extends Fragment {
             listFragmentSetDataFilter(filterText, isAccessebility);
         }
 
-
-     /*   LinearLayout filterContainer = (LinearLayout) getView().findViewById(R.id.filter_container);
-        filterContainer.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
-        int containerHeight = filterContainer.getMeasuredHeight();
-        Log.d("containerHeight", String.valueOf(containerHeight));
-
-      */
     }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        // Inflate the layout for this fragment
 
         View view = inflater.inflate(R.layout.fragment_list, container, false);
-//------------
-//------------
-//------------
+        getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER);
+
 
         EditText userFilter = (EditText)view.findViewById(R.id.objectFilter);
 
@@ -348,20 +340,19 @@ public class ListFragment extends Fragment {
         switchAccessibility.setText("Доступная среда");
 
         filterText = "";
-       // isAccessebility = true;
         switchAccessibility.setChecked(isAccessebility);
 
         switchAccessibility.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked) {
-                    Log.d("Accessibility","AccessibilityON");
+                    // пользователь включил доступную среду
                     listFragmentSetDataFilter(filterText, true);
                     isAccessebility = true;
                     SharedPreferences.Editor prefEditor = settings.edit();
                     prefEditor.putBoolean(PREF_ACCESS, isAccessebility);
                     prefEditor.apply();
                 } else {
-                    Log.d("Accessibility","AccessibilityOFF");
+                    //пользователь выключил доступную среду
                     listFragmentSetDataFilter(filterText, false);
                     isAccessebility = false;
                     SharedPreferences.Editor prefEditor = settings.edit();
@@ -378,7 +369,6 @@ public class ListFragment extends Fragment {
             // при изменении текста выполняем фильтрацию
             public void onTextChanged(CharSequence s, int start, int before, int count) {
                 filterText = s.toString();
-                Log.d("ListFragment","onTextChanged");
                 listFragmentSetDataFilter(filterText,isAccessebility);
             }
         });
@@ -407,6 +397,7 @@ public class ListFragment extends Fragment {
         });
 
 
+        //кнопка назад (по дефолту скрыта)
         Button buttonBack = (Button) view.findViewById(R.id.buttonBack);
         buttonBack.setOnClickListener(new View.OnClickListener(){
             @Override
@@ -416,42 +407,36 @@ public class ListFragment extends Fragment {
             }
         });
 
-//-------
-
+        // контейнер с фильтром для поиска, будет скрываться при движении вверх и показываться при движенри вниз
         filterContainer = (LinearLayout) view.findViewById(R.id.filter_container);
         RecyclerView objectsList = (RecyclerView) view.findViewById(R.id.objectsList);
 
         containerHeight = getHeightOfView(filterContainer);
-        Log.d("containerHeight", String.valueOf(containerHeight));
 
         objectsList.setPadding(objectsList.getPaddingLeft(), containerHeight,
                 objectsList.getPaddingRight(), objectsList.getPaddingBottom());
-
-        //objectsList.setHasFixedSize(true);
 
 
         objectsList.addOnScrollListener(new MyRecyclerScroll() {
             @Override
             public void show() {
+                //показываем контейнер с фильтром
                 filterContainer.animate().translationY(0).setInterpolator(new DecelerateInterpolator(2)).start();
             }
 
             @Override
             public void hide() {
+                // скрываем контейнер с фильтром
                 filterContainer.animate().translationY(-containerHeight).setInterpolator(new AccelerateInterpolator(2)).start();
             }
         });
-
-
-
-
 
         return view;
     }
 
     private int getHeightOfView(View contentview) {
+        //получает высоту требуемого View
         contentview.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
-        //contentview.getMeasuredWidth();
         return contentview.getMeasuredHeight();
     }
 

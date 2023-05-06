@@ -1,17 +1,10 @@
 package com.example.voronezh;
 
-
-
-import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.ArrayAdapter;
-import android.widget.Spinner;
 
-//import android.app.Fragment;
-//import android.app.FragmentManager;
-//import android.app.FragmentTransaction;
 
+import androidx.annotation.NonNull;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentTransaction;
@@ -25,11 +18,6 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements GridFragment.OnFragmentSendDataGridListener, ListFragment.OnFragmentSendDataListListener, ObjectFragment.OnFragmentSendDataObjectListener,FavoritesFragment.OnFragmentSendDataFavoriteListener {
 
- //   FragmentManager myFragmentManager;
-    GridFragment myGridFragment;
-    ListFragment myListFragment;
-    ObjectFragment myObjectFragment;
-
     TypeObject typeObjectActivity;
     Object objectActivity;
     int positionListObject;
@@ -42,8 +30,9 @@ public class MainActivity extends AppCompatActivity implements GridFragment.OnFr
     final static String TAG_FAVORITES = "FRAGMENT_FAVORITES";
 
     @Override
-    protected void onSaveInstanceState(Bundle outState) {
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
+        // сохраняем данные перед уничтожением Activity
         outState.putSerializable(TypeObject.class.getSimpleName(), typeObjectActivity);
         outState.putSerializable(Object.class.getSimpleName(), objectActivity);
         outState.putInt("positionListObject", positionListObject);
@@ -52,17 +41,14 @@ public class MainActivity extends AppCompatActivity implements GridFragment.OnFr
     protected void onCreate(Bundle savedInstanceState) {
 
         if (savedInstanceState != null) {
+            //получаем сохраненные данные из ранее созданной Activity
             typeObjectActivity = (TypeObject) savedInstanceState.getSerializable(TypeObject.class.getSimpleName());
             objectActivity = (Object) savedInstanceState.getSerializable(Object.class.getSimpleName());
             positionListObject = (int) savedInstanceState.getInt("positionListObject");
         }
 
         super.onCreate(savedInstanceState);
-        //скрывает название программы
-        //getSupportActionBar().hide();
         setContentView(R.layout.activity_main);
-
-    //    myFragmentManager = getSupportFragmentManager();
 
         BottomNavigationView bottomNavigationView = (BottomNavigationView) findViewById(R.id.bottom_navigation);
 
@@ -78,35 +64,20 @@ public class MainActivity extends AppCompatActivity implements GridFragment.OnFr
     }
 
     private final BottomNavigationView.OnNavigationItemSelectedListener navListener = item -> {
-        // By using switch we can easily get
-        // the selected fragment
-        // by using there id.
-        Fragment selectedFragment = null;
+        // определяет на какую кнопку нажали в BottomNavigationView
         int itemId = item.getItemId();
         if (itemId == R.id.home) {
             changeFragment(TAG_GRID);
-            Log.d("home","home");
-            //selectedFragment = new AlgorithmFragment();
         } else if (itemId == R.id.search) {
             changeFragment(TAG_SEARCH);
-            Log.d("search","search");
-           /// selectedFragment = new CourseFragment();
         } else if (itemId == R.id.favorite) {
-            Log.d("favorite","favorite");
             changeFragment(TAG_FAVORITES);
-           /// selectedFragment = new ProfileFragment();
-        }
-        // It will help to replace the
-        // one fragment to other.
-        if (selectedFragment != null) {
-            //getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container, selectedFragment).commit();
         }
         return true;
     };
 
     public void changeFragment(String neededToShowFragmentTag) {
-        //при первом вызове создает заданный фрагмент - neededToShowFragmentTag
-        // в последующих вызовах показывает заданный фрагмент и меняет данные внутри фрагмента
+        // создает необходимый фрагмент
         FragmentManager fragmentManager = getSupportFragmentManager();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
 
@@ -114,7 +85,6 @@ public class MainActivity extends AppCompatActivity implements GridFragment.OnFr
         Fragment neededToShowFragment = null;
 
         Fragment currentShownFragment = null;
-        Bundle bundle;
 
         if (existingFragments != null) {
             for (Fragment fragment : existingFragments) {
@@ -134,9 +104,11 @@ public class MainActivity extends AppCompatActivity implements GridFragment.OnFr
                         neededToShowFragment = new GridFragment();
                         break;
                     case TAG_LIST:
+                        fragmentTransaction.setCustomAnimations(R.anim.slide_in_right, R.anim.slide_out_left);
                         neededToShowFragment = new ListFragment();
                         break;
                     case TAG_OBJECT:
+                        fragmentTransaction.setCustomAnimations(R.anim.slide_in_right, R.anim.slide_out_left);
                         neededToShowFragment = new ObjectFragment();
                         break;
                     case TAG_SEARCH:
@@ -219,7 +191,6 @@ public class MainActivity extends AppCompatActivity implements GridFragment.OnFr
     @Override
     public void onSendDataListObject(Object selectedObject, int position) {
         // создает или показывает фрагмент с данными конкретного объекта
-
         objectActivity = selectedObject;
         positionListObject = position;
         changeFragment(TAG_OBJECT);
@@ -258,6 +229,7 @@ public class MainActivity extends AppCompatActivity implements GridFragment.OnFr
 
     @Override
     public void onAddObjectFavorite(Object object) {
+        //добавляет объект в избранное
         FavoritesFragment fragmentFavorites = (FavoritesFragment) getSupportFragmentManager().findFragmentByTag(TAG_FAVORITES);
         if (fragmentFavorites != null)  {
             fragmentFavorites.addObjectFavorite(object, positionListObject);
@@ -265,6 +237,7 @@ public class MainActivity extends AppCompatActivity implements GridFragment.OnFr
     }
     @Override
     public void onRemoveObjectFavorite() {
+        //удаляет объект из избранного
         FavoritesFragment fragmentFavorites = (FavoritesFragment) getSupportFragmentManager().findFragmentByTag(TAG_FAVORITES);
         if (fragmentFavorites != null)  {
             fragmentFavorites.removeObjectFavorite(positionListObject);
