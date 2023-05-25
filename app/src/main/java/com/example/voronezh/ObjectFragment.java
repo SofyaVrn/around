@@ -239,19 +239,9 @@ public class ObjectFragment extends Fragment  {
         apiInterface = APIRetrofitClient.getClient().create(APIRetrofitInterface.class);
         Call<ImageObjectList> call = apiInterface.getImageObjectList(object.getId());
 
-        Log.d("CALL",call.request().headers().toString()+"");
-
-        Log.d("APIRetrofitClient13","APIRetrofitClient13");
         call.enqueue(new Callback<ImageObjectList>() {
             @Override
             public void onResponse(Call<ImageObjectList> call, Response<ImageObjectList> response) {
-
-                Log.d("onResponse","onResponse");
-                Log.d("TAGCODE",response.code()+"");
-
-                Log.d("TAG",response.raw().protocol()+"");
-
-                //String displayResponse = "";
                 if (response.code() == 200) {
                     ImageObjectList resource = response.body();
 
@@ -263,10 +253,7 @@ public class ObjectFragment extends Fragment  {
                     for (ImageObjectList.ImagesList image : imageList) {
                         imagesUrl[i] = image.path;
                         i++;
-                        Log.d("image", image.path);
-                        Log.d("id", String.valueOf(image.id));
                     }
-                    Log.d("SIZE", String.valueOf(imagesUrl.length));
                     setImagesOnSlider(imagesUrl);
                 }
 
@@ -274,7 +261,6 @@ public class ObjectFragment extends Fragment  {
 
             @Override
             public void onFailure(Call<ImageObjectList> call, Throwable t) {
-                Log.d("onFailure","onFailure");
                 call.cancel();
 
                 if (getView()!= null) {
@@ -287,8 +273,6 @@ public class ObjectFragment extends Fragment  {
 
     public void setImagesOnSlider(String[] imagesUrl) {
         //устанавливает полученные фотографии для просмотра в ViewPager
-        Log.d("setImagesOnSlider","setImagesOnSlider");
-
         if (getView()!= null) {
 
             RelativeLayout relativeLayoutPager = (RelativeLayout) getView().findViewById(R.id.relativeLayoutPager);

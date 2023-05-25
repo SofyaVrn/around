@@ -1228,7 +1228,7 @@ public class SearchFragment extends Fragment implements ClusterListener, Cluster
            }
        };
 
-       String imgUrl = "https://around.sourceforge.io/imagesproject/" + object.getId() +".png";
+       String imgUrl = object.getImgUrl();
        if (MainApplication.IMAGE_CACHING) {
            Picasso.with(getContext()).load(imgUrl).centerCrop().fit().placeholder(R.drawable.progress_animation).error(R.drawable.image_not_found).into(imageObject);
        } else {
